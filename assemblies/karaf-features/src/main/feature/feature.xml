@@ -118,6 +118,7 @@
     <bundle start-level="81">mvn:org.opencastproject/matterhorn-db/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/matterhorn-dublincore/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/matterhorn-kernel/${project.version}</bundle>
+    <bundle start-level="82">mvn:org.opencastproject/matterhorn-logging-workflowoperation/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/matterhorn-message-broker-api/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/matterhorn-message-broker-impl/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/matterhorn-metadata-api/${project.version}</bundle>
