@@ -83,7 +83,6 @@ public class LoggingWorkflowOperationHandler extends AbstractWorkflowOperationHa
       logMediaPackageJSON = true;
     }
 
-    // Check if there is an mpeg-7 catalog containing video segments
     MediaPackage mediaPackage = workflowInstance.getMediaPackage();
 
     // Log media package as JSON

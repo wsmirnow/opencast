@@ -8,12 +8,14 @@ Description
 The LoggingWorkflowOperationHandler is primarily meant for testing and debugging purposes. It allows to log the current
 state of of a workflow and/or its media package.
 
-|Name                |Default|Description                                                 |
-|--------------------|-------|------------------------------------------------------------|
-|directory           |       |If set, write the logs to this directory                    |
-|workflowinstance-xml|`false`|Log the current state of the workflow as XML                |
-|mediapackage-xml    |`false`|Log the state of the current workflows media package as XML |
-|mediapackage-json   |`true` |Log the state of the current workflows media package as JSON|
+|Name                |Default|Description                                                  |
+|--------------------|-------|-------------------------------------------------------------|
+|directory           |       |If set, write the logs to this directory                     |
+|workflowinstance-xml|`false`|Log the current state of the workflow as XML                 |
+|mediapackage-xml    |`false`|Log the state of the current workflow's media package as XML |
+|mediapackage-json   |`true` |Log the state of the current workflow's media package as JSON|
+
+If any format is specified, it will overwrite all defaults.
 
 
 Operation Example
