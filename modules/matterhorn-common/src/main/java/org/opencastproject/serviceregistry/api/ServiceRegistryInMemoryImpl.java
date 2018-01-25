@@ -699,6 +699,11 @@ public class ServiceRegistryInMemoryImpl implements ServiceRegistry {
     return result;
   }
 
+  @Override
+  public List<String> getJobPayloads(String operation) throws ServiceRegistryException {
+    throw new ServiceRegistryException("Not implemented in test specific service registry");
+  }
+
   /**
    * {@inheritDoc}
    *

@@ -57,6 +57,8 @@ import org.opencastproject.util.doc.rest.RestQuery;
 import org.opencastproject.util.doc.rest.RestResponse;
 import org.opencastproject.util.doc.rest.RestService;
 
+import com.google.gson.Gson;
+
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.ComponentContext;
 
@@ -555,6 +557,26 @@ public class ServiceRegistryEndpoint {
   public JaxbJobList getJobsAsXml(@QueryParam("serviceType") String serviceType, @QueryParam("status") Job.Status status) {
     try {
       return new JaxbJobList(serviceRegistry.getJobs(serviceType, status));
+    } catch (ServiceRegistryException e) {
+      throw new WebApplicationException(e);
+    }
+
+  }
+
+  @GET
+  @Path("job/payloads.json")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RestQuery(name = "payloads", description = "Return job payloads as JSON.", returnDescription = "Payloads as JSON",
+          pathParameters = {
+          @RestParameter(name = "operation", isRequired = true, type = Type.STRING,
+                  description = "Operation to filter by")
+          }, reponses = {
+          @RestResponse(responseCode = SC_OK, description = "Returning payloads.") })
+  public Response getJobPayloads(@QueryParam("operation") String operation) {
+    try {
+      List<String> payloads = serviceRegistry.getJobPayloads(operation);
+      String result = new Gson().toJson(payloads);
+      return Response.ok(result).build();
     } catch (ServiceRegistryException e) {
       throw new WebApplicationException(e);
     }

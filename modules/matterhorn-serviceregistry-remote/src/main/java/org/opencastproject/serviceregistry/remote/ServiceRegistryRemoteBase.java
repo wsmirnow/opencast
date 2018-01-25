@@ -51,6 +51,9 @@ import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.QueryStringBuilder;
 import org.opencastproject.util.UrlSupport;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -66,6 +69,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
@@ -514,6 +518,30 @@ public abstract class ServiceRegistryRemoteBase implements ServiceRegistry {
       if (responseStatusCode == HttpStatus.SC_OK) {
         final JaxbJobList jaxbJobList = JobParser.parseJobList(response.getEntity().getContent());
         return $(jaxbJobList.getJobs()).map(JaxbJob.fnToJob()).toList();
+      }
+    } catch (IOException e) {
+      throw new ServiceRegistryException("Unable to get jobs", e);
+    } finally {
+      getHttpClient().close(response);
+    }
+    throw new ServiceRegistryException("Unable to retrieve jobs via http:" + response.getStatusLine());
+  }
+
+  @Override
+  public List<String> getJobPayloads(String operation) throws ServiceRegistryException {
+    if (operation == null) {
+      throw new ServiceRegistryException("Operation must not be null");
+    }
+    QueryStringBuilder qsb = new QueryStringBuilder("job/payload.json").add("operation", operation);
+    final HttpGet get = get(qsb.toString());
+    HttpResponse response = null;
+    int responseStatusCode;
+    try {
+      response = getHttpClient().execute(get);
+      responseStatusCode = response.getStatusLine().getStatusCode();
+      if (responseStatusCode == HttpStatus.SC_OK) {
+        return new Gson().fromJson(new InputStreamReader(response.getEntity().getContent()),
+                new TypeToken<List<String>>(){}.getType());
       }
     } catch (IOException e) {
       throw new ServiceRegistryException("Unable to get jobs", e);
