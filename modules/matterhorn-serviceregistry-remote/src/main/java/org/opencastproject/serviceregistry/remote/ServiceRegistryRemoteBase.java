@@ -532,7 +532,7 @@ public abstract class ServiceRegistryRemoteBase implements ServiceRegistry {
     if (operation == null) {
       throw new ServiceRegistryException("Operation must not be null");
     }
-    QueryStringBuilder qsb = new QueryStringBuilder("job/payload.json").add("operation", operation);
+    QueryStringBuilder qsb = new QueryStringBuilder("job/payloads.json").add("operation", operation);
     final HttpGet get = get(qsb.toString());
     HttpResponse response = null;
     int responseStatusCode;
@@ -541,7 +541,8 @@ public abstract class ServiceRegistryRemoteBase implements ServiceRegistry {
       responseStatusCode = response.getStatusLine().getStatusCode();
       if (responseStatusCode == HttpStatus.SC_OK) {
         return new Gson().fromJson(new InputStreamReader(response.getEntity().getContent()),
-                new TypeToken<List<String>>(){}.getType());
+                new TypeToken<List<String>>() {
+                }.getType());
       }
     } catch (IOException e) {
       throw new ServiceRegistryException("Unable to get jobs", e);
