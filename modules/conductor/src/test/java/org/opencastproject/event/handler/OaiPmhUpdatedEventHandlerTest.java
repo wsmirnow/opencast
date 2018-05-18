@@ -49,6 +49,7 @@ import org.opencastproject.security.api.User;
 import org.opencastproject.workspace.api.Workspace;
 
 import org.easymock.Capture;
+import org.easymock.EasyMock;
 import org.easymock.EasyMockRule;
 import org.easymock.EasyMockSupport;
 import org.easymock.Mock;
@@ -162,7 +163,7 @@ public class OaiPmhUpdatedEventHandlerTest extends EasyMockSupport {
     SearchResult searchResultMock = mock(MockType.NICE, SearchResult.class);
     expect(searchResultMock.getItems()).andReturn(Collections.EMPTY_LIST).anyTimes();
     queryCapture = Capture.newInstance();
-    expect(oaiPmhDatabaseMock.search(capture(queryCapture))).andReturn(searchResultMock);
+    expect(oaiPmhDatabaseMock.search(capture(queryCapture), EasyMock.anyObject())).andReturn(searchResultMock);
 
     replayAll();
 
@@ -245,6 +246,6 @@ public class OaiPmhUpdatedEventHandlerTest extends EasyMockSupport {
     expect(searchResultMock.getItems()).andReturn(Collections.singletonList(searchResultItemMock)).anyTimes();
     expect(searchResultItemMock.getRepository()).andReturn(OAIPMH_REPOSITORY).anyTimes();
     queryCapture = Capture.newInstance();
-    expect(oaiPmhDatabaseMock.search(capture(queryCapture))).andReturn(searchResultMock);
+    expect(oaiPmhDatabaseMock.search(capture(queryCapture), EasyMock.anyObject())).andReturn(searchResultMock);
   }
 }

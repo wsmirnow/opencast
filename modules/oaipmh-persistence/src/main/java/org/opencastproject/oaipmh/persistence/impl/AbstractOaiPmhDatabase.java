@@ -29,6 +29,7 @@ import org.opencastproject.oaipmh.persistence.OaiPmhElementEntity;
 import org.opencastproject.oaipmh.persistence.OaiPmhEntity;
 import org.opencastproject.oaipmh.persistence.Query;
 import org.opencastproject.oaipmh.persistence.SearchResult;
+import org.opencastproject.oaipmh.persistence.SearchResultElementItem;
 import org.opencastproject.oaipmh.persistence.SearchResultItem;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.util.MimeTypes;
@@ -46,6 +47,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
@@ -219,7 +221,7 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
   }
 
   @Override
-  public SearchResult search(Query query) {
+  public SearchResult search(Query query, Map<String, String> setDef) {
     EntityManager em = null;
     try {
       em = getEmf().createEntityManager();
@@ -258,7 +260,39 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
         typedQuery.setMaxResults(maxResult);
       for (int startPosition : query.getOffset())
         typedQuery.setFirstResult(startPosition);
-      return createSearchResult(typedQuery);
+
+      SearchResult result = createSearchResult(typedQuery);
+      if (setDef == null) {
+        return result;
+      }
+      String flavor = setDef.get("flavor");
+      String type = setDef.get("type");
+      String contains = setDef.get("contains");
+      String containsnot = setDef.get("containsnot");
+      final List<SearchResultItem> filteredItems = new ArrayList<>();
+      for (SearchResultItem item: result.getItems()) {
+        for (SearchResultElementItem element: item.getElements()) {
+          logger.debug("flavor: {}", element.getFlavor());
+          logger.debug("type: {}", element.getType());
+          logger.debug("XML: {}", element.getXml());
+          // Check if type and flavor match our filter rule.
+          // We only include items with matching elements.
+          if (!element.getFlavor().equals(flavor) || !element.getType().equals(type)) {
+            continue;
+          }
+          if (StringUtils.isNotEmpty(contains)) {
+            if (element.getXml().contains(contains)) {
+              filteredItems.add(item);
+            }
+          } else {
+            if (!element.getXml().contains(containsnot)) {
+              filteredItems.add(item);
+            }
+          }
+          break;
+        }
+      }
+      return new SearchResultImpl(result.getOffset(), result.getLimit(), filteredItems);
     } finally {
       if (em != null)
         em.close();

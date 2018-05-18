@@ -5,6 +5,7 @@
                activate="activate">
   <implementation class="org.opencastproject.oaipmh.server.DefaultRepository" />
   <service>
+    <provide interface="org.osgi.service.cm.ManagedService" />
     <provide interface="org.opencastproject.oaipmh.server.OaiPmhRepository" />
   </service>
   <property name="service.description" value="Opencast default OAI-PMH repository" />

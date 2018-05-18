@@ -254,7 +254,7 @@ public class OaiPmhPublicationServiceImplTest {
           throws PublicationException, OaiPmhDatabaseException, MediaPackageException, DistributionException {
     OaiPmhDatabase oaiDb = EasyMock.createNiceMock(OaiPmhDatabase.class);
     // mock empty DB
-    EasyMock.expect(oaiDb.search(EasyMock.anyObject(Query.class)))
+    EasyMock.expect(oaiDb.search(EasyMock.anyObject(Query.class), EasyMock.anyObject()))
             .andReturn(new SearchResultImpl(0, 0, new ArrayList<>())).once();
     Capture<MediaPackage> storedMpCap = EasyMock.newCapture();
     // capture stored media package

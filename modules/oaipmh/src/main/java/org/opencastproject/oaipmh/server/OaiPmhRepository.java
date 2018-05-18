@@ -29,14 +29,11 @@ import static org.opencastproject.oaipmh.server.Functions.asDate;
 import static org.opencastproject.util.data.Monadics.mlist;
 import static org.opencastproject.util.data.Option.some;
 import static org.opencastproject.util.data.Prelude.unexhaustiveMatch;
-import static org.opencastproject.util.data.functions.Misc.chuck;
 
-import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.oaipmh.Granularity;
 import org.opencastproject.oaipmh.OaiPmhConstants;
 import org.opencastproject.oaipmh.OaiPmhUtil;
 import org.opencastproject.oaipmh.persistence.OaiPmhDatabase;
-import org.opencastproject.oaipmh.persistence.OaiPmhDatabaseException;
 import org.opencastproject.oaipmh.persistence.SearchResult;
 import org.opencastproject.oaipmh.persistence.SearchResultItem;
 import org.opencastproject.oaipmh.util.XmlGen;
@@ -46,6 +43,8 @@ import org.opencastproject.util.data.Option;
 import org.opencastproject.util.data.Predicate;
 import org.opencastproject.util.data.Tuple;
 
+import org.osgi.service.cm.ConfigurationException;
+import org.osgi.service.cm.ManagedService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
@@ -54,7 +53,14 @@ import org.w3c.dom.Node;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Dictionary;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * An OAI-PMH protocol compliant repository.
@@ -77,7 +83,7 @@ import java.util.List;
  */
 // todo - malformed date parameter must produce a BadArgument error - if a date parameter has a finer granularity than
 //        supported by the repository this must produce a BadArgument error
-public abstract class OaiPmhRepository {
+public abstract class OaiPmhRepository implements ManagedService {
   private static final Logger logger = LoggerFactory.getLogger(OaiPmhRepository.class);
   private static final OaiDcMetadataProvider OAI_DC_METADATA_PROVIDER = new OaiDcMetadataProvider();
   private static final String OAI_NS = OaiPmhConstants.OAI_2_0_XML_NS;
@@ -93,6 +99,33 @@ public abstract class OaiPmhRepository {
   public abstract OaiPmhDatabase getPersistence();
 
   public abstract String getAdminEmail();
+
+  private Map<String, Map<String, String>> sets = new HashMap<>();
+
+  @Override
+  public void updated(Dictionary<String, ?> properties) throws ConfigurationException {
+    if (properties == null) {
+      return;
+    }
+
+    // Wipe set configuration in case some got removed
+    sets = new HashMap<>();
+    Pattern keyPattern = Pattern.compile("^set\\.(\\w+)\\.(\\w+)$");
+    for (Enumeration<String> enumeration = properties.keys(); enumeration.hasMoreElements();) {
+      String propKey = enumeration.nextElement();
+      Matcher matcher = keyPattern.matcher(propKey);
+      if (matcher.find()) {
+        String name = matcher.group(1);
+        String key = matcher.group(2);
+        String value = (String) properties.get(propKey);
+        if (!sets.containsKey(name)) {
+          sets.put(name, new HashMap<>());
+        }
+         sets.get(name).put(key, value);
+        logger.warn("set({}): {} -> {}", name, key, value);
+      }
+    }
+  }
 
   /**
    * Save a query.
@@ -123,16 +156,6 @@ public abstract class OaiPmhRepository {
   /** Return a list of all available metadata providers. The <code>oai_dc</code> format is always included. */
   public final List<MetadataProvider> getMetadataProviders() {
     return mlist(getRepositoryMetadataProviders()).cons(OAI_DC_METADATA_PROVIDER).value();
-  }
-
-  /** Add an item to the repository. */
-  public void addItem(MediaPackage mp) {
-    getPersistence().search(queryRepo(getRepositoryId()).build());
-    try {
-      getPersistence().store(mp, getRepositoryId());
-    } catch (OaiPmhDatabaseException e) {
-      chuck(e);
-    }
   }
 
   /** Create an OAI-PMH response based on the given request params. */
@@ -178,8 +201,12 @@ public abstract class OaiPmhRepository {
       return createBadArgumentResponse(p);
     } else {
       for (final MetadataProvider metadataProvider : p.getMetadataPrefix().bind(getMetadataProvider)) {
+        Map<String, String> setDef = null;
+        if (p.getSet().isSome()) {
+          setDef = sets.get(p.getSet().get());
+        }
         final SearchResult res = getPersistence()
-                .search(queryRepo(getRepositoryId()).mediaPackageId(p.getIdentifier()).build());
+                .search(queryRepo(getRepositoryId()).mediaPackageId(p.getIdentifier()).build(), setDef);
         final List<SearchResultItem> items = res.getItems();
         switch (items.size()) {
           case 0:
@@ -234,7 +261,7 @@ public abstract class OaiPmhRepository {
 
   private XmlGen handleListMetadataFormats(final Params p) {
     for (String id : p.getIdentifier()) {
-      final SearchResult res = getPersistence().search(queryRepo(getRepositoryId()).mediaPackageId(id).build());
+      final SearchResult res = getPersistence().search(queryRepo(getRepositoryId()).mediaPackageId(id).build(), null);
       if (res.getItems().size() != 1)
         return createIdDoesNotExistResponse(p);
     }
@@ -262,6 +289,7 @@ public abstract class OaiPmhRepository {
             return mlist(params.getResult().getItems()).map(new Function<SearchResultItem, Node>() {
               @Override
               public Node apply(SearchResultItem item) {
+                logger.debug("Requested set: {}", set);
                 final Element metadata = params.getMetadataProvider().createMetadata(OaiPmhRepository.this, item, set);
                 return record(item, metadata);
               }
@@ -299,20 +327,13 @@ public abstract class OaiPmhRepository {
     return new OaiVerbXmlGen(this, p) {
       @Override
       public Element create() {
-        return createNoSetHierarchyResponse(p).create();
-        // leave to following code in place for the time sets are supported
-//        // define sets
-//        @SuppressWarnings("unchecked")
-//        final List<List<String>> sets = _();
-//        // map to nodes
-//        final List<Node> setNodes = mlist(sets).map(new Function<List<String>, Node>() {
-//          @Override
-//          public Node apply(List<String> strings) {
-//            return $e("set", $eTxt("setSpec", strings.get(0)), $eTxt("setName", strings.get(1)),
-//                    $e("setDescription", dc($eTxt("dc:description", strings.get(2)))));
-//          }
-//        }).value();
-//        return oai(request(), verb(setNodes));
+        List<Node> setNodes = new LinkedList<>();
+        for (Map.Entry<String, Map<String, String>> set: sets.entrySet()) {
+          String name = set.getKey();
+          String description = set.getValue().get("description");
+          setNodes.add($e("set", $eTxt("setSpec", name), $eTxt("setName", description)));
+        }
+        return oai(request(), verb(setNodes));
       }
     };
   }
@@ -473,23 +494,31 @@ public abstract class OaiPmhRepository {
           final Option<String>[] set = new Option[]{p.getSet()};
           if (!resumptionTokenExists) {
             // start a new query
+            Map<String, String> setDef = null;
+            if (set[0].isSome()) {
+              setDef = sets.get(set[0].get());
+            }
             result = getPersistence().search(
                     queryRepo(getRepositoryId())
                             .modifiedAfter(from)
                             .modifiedBefore(until)
-                            .limit(getResultLimit()).build());
+                            .limit(getResultLimit()).build(), setDef);
           } else {
             // resume query
             result = getSavedQuery(p.getResumptionToken().get()).fold(new Option.Match<ResumableQuery, SearchResult>() {
               @Override
               public SearchResult some(ResumableQuery rq) {
                 set[0] = rq.getSet();
+                Map<String, String> setDef = null;
+                if (set[0].isSome()) {
+                  setDef = sets.get(set[0].get());
+                }
                 return getPersistence().search(
                         queryRepo(getRepositoryId())
                                 .modifiedAfter(rq.getLastResult())
                                 .modifiedBefore(rq.getUntil())
                                 .limit(getResultLimit())
-                                .subsequentRequest(true).build());
+                                .subsequentRequest(true).build(), setDef);
               }
 
               @Override

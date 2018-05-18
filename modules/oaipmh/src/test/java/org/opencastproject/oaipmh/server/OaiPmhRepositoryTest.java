@@ -82,6 +82,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 import javax.xml.namespace.NamespaceContext;
@@ -250,7 +251,7 @@ public class OaiPmhRepositoryTest {
     EasyMock.expect(result.getLimit()).andReturn(RESULT_LIMIT).anyTimes();
     EasyMock.expect(result.getOffset()).andReturn(0L).times(3).andReturn(RESULT_LIMIT).anyTimes();
     EasyMock.expect(result.size()).andReturn((long) items1.size()).times(4).andReturn((long) items2.size()).times(4);
-    EasyMock.expect(persistence.search(EasyMock.<Query>anyObject())).andReturn(result).anyTimes();
+    EasyMock.expect(persistence.search(EasyMock.<Query>anyObject(), EasyMock.anyObject())).andReturn(result).anyTimes();
     EasyMock.replay(persistence);
     EasyMock.replay(result);
     // do testing
@@ -405,7 +406,7 @@ public class OaiPmhRepositoryTest {
       }
 
       @Override
-      public SearchResult search(Query q) {
+      public SearchResult search(Query q, Map<String, String> setDef) {
         return result;
       }
     };

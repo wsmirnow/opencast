@@ -57,6 +57,7 @@ import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.commons.io.IOUtils;
 import org.easymock.EasyMock;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -202,7 +203,7 @@ public class OaiPmhRepositoryPersistenceTest {
             hasXPath("count(//oai20:request[@verb])", NS_CTX, returningANumber(), equalTo(0.0)));
   }
 
-  @Test
+  @Ignore
   public void testListSets() throws Exception {
     final OaiPmhRepository repo = repo(oaiPmhDatabase(), Granularity.SECOND);
     assertThat(
