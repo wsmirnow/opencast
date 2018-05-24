@@ -190,7 +190,7 @@ public class OaiPmhPublicationServiceImpl extends AbstractJobProducer implements
           throws PublicationException, MediaPackageException {
     String mpId = mediaPackage.getIdentifier().compact();
     SearchResult searchResult = oaiPmhDatabase.search(QueryBuilder.queryRepo(repository).mediaPackageId(mpId)
-            .isDeleted(false).build(), null);
+            .isDeleted(false).build());
     // retract oai-pmh if published
     if (searchResult.size() > 0) {
       try {
@@ -297,7 +297,7 @@ public class OaiPmhPublicationServiceImpl extends AbstractJobProducer implements
     // track elements for retraction
     MediaPackage oaiPmhMp = null;
     SearchResult searchResult = oaiPmhDatabase.search(QueryBuilder.queryRepo(repository).mediaPackageId(mpId)
-            .isDeleted(false).build(), null);
+            .isDeleted(false).build());
     for (SearchResultItem searchResultItem : searchResult.getItems()) {
       if (oaiPmhMp == null) {
         oaiPmhMp = searchResultItem.getMediaPackage();
@@ -379,7 +379,7 @@ public class OaiPmhPublicationServiceImpl extends AbstractJobProducer implements
 
     final MediaPackage filteredMp;
     final SearchResult result = oaiPmhDatabase.search(QueryBuilder.queryRepo(repository).mediaPackageId(mediaPackage)
-            .isDeleted(false).build(), null);
+            .isDeleted(false).build());
     if (result.size() == 1) {
       // apply tags and flavors to the current media package
       try {

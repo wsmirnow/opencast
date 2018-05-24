@@ -203,11 +203,11 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
             throw new OaiPmhDatabaseException(e1);
           }
           i++;
-          logger.info("Deleting OAI-PMH entry '{}' from  repository '{}' failed, retry {} times.",
-                  new String[] { mediaPackageId, repository, Integer.toString(i) });
+          logger.info("Deleting OAI-PMH entry '{}' from  repository '{}' failed, retry {} times.", mediaPackageId,
+                  repository, i);
         } else {
-          logger.error("Could not delete mediapackage '{}' from OAI-PMH repository '{}': {}",
-                  new String[] { mediaPackageId, repository, ExceptionUtils.getStackTrace(e) });
+          logger.error("Could not delete mediapackage '{}' from OAI-PMH repository '{}'", mediaPackageId, repository,
+                  e);
           if (tx != null && tx.isActive())
             tx.rollback();
 
@@ -221,7 +221,7 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
   }
 
   @Override
-  public SearchResult search(Query query, Map<String, String> setDef) {
+  public SearchResult search(Query query) {
     EntityManager em = null;
     try {
       em = getEmf().createEntityManager();
@@ -262,8 +262,14 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
         typedQuery.setFirstResult(startPosition);
 
       SearchResult result = createSearchResult(typedQuery);
-      if (setDef == null) {
+      // Return immediately if no sets are defined
+      if (query.getSetSpec().isNone()) {
         return result;
+      }
+      Map<String, String> setDef = query.getSetDefinition().get(query.getSetSpec().get());
+      if (setDef == null) {
+        // return empty result if there is no definition for a requested setSpec
+        return new SearchResultImpl(result.getOffset(), result.getLimit(), new ArrayList<>());
       }
       String flavor = setDef.get("flavor");
       String type = setDef.get("type");

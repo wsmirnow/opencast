@@ -23,8 +23,6 @@ package org.opencastproject.oaipmh.persistence;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.util.NotFoundException;
 
-import java.util.Map;
-
 /**
  * API that defines persistent storage of OAI-PMH.
  */
@@ -62,5 +60,5 @@ public interface OaiPmhDatabase {
    *          the query
    * @return a search result
    */
-  SearchResult search(Query q, Map<String, String> setDef);
+  SearchResult search(Query q);
 }

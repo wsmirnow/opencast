@@ -118,7 +118,7 @@ public class OaiPmhPersistenceTest {
 
     oaiPmhDatabase.delete(mp1.getIdentifier().toString(), REPOSITORY_ID_1);
 
-    SearchResult search = oaiPmhDatabase.search(query().mediaPackageId(mp1).build(), null);
+    SearchResult search = oaiPmhDatabase.search(query().mediaPackageId(mp1).build());
     Assert.assertEquals(1, search.size());
     Assert.assertTrue(search.getItems().get(0).isDeleted());
   }
@@ -127,7 +127,7 @@ public class OaiPmhPersistenceTest {
   public void testRetrieving() throws Exception {
     oaiPmhDatabase.store(mp1, REPOSITORY_ID_1);
 
-    SearchResult search = oaiPmhDatabase.search(query().mediaPackageId(mp1).build(), null);
+    SearchResult search = oaiPmhDatabase.search(query().mediaPackageId(mp1).build());
     Assert.assertEquals(1, search.size());
     SearchResultItem searchResultItem = search.getItems().get(0);
     Assert.assertEquals(REPOSITORY_ID_1, searchResultItem.getRepository());
@@ -151,10 +151,10 @@ public class OaiPmhPersistenceTest {
 
     oaiPmhDatabase.store(mp1, REPOSITORY_ID_2);
 
-    search = oaiPmhDatabase.search(query().mediaPackageId(mp1).build(), null);
+    search = oaiPmhDatabase.search(query().mediaPackageId(mp1).build());
     Assert.assertEquals(2, search.size());
 
-    search = oaiPmhDatabase.search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_2).build(), null);
+    search = oaiPmhDatabase.search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_2).build());
     Assert.assertEquals(1, search.size());
     searchResultItem = search.getItems().get(0);
     Assert.assertEquals(REPOSITORY_ID_2, searchResultItem.getRepository());
@@ -174,22 +174,21 @@ public class OaiPmhPersistenceTest {
               catalogItem.isSeriesDublinCore());
     }
 
-    search = oaiPmhDatabase.search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_1).build(), null);
+    search = oaiPmhDatabase.search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_1).build());
     Assert.assertEquals(1, search.size());
 
-    search = oaiPmhDatabase.search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_2).build(), null);
+    search = oaiPmhDatabase.search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_2).build());
     Assert.assertEquals(1, search.size());
 
     search = oaiPmhDatabase
-            .search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_2).modifiedAfter(new Date()).build(), null);
+            .search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_2).modifiedAfter(new Date()).build());
     Assert.assertEquals(0, search.size());
 
     search = oaiPmhDatabase
-            .search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_2).modifiedAfter(dateBeforeStoring)
-                    .build(), null);
+            .search(query().mediaPackageId(mp1).repositoryId(REPOSITORY_ID_2).modifiedAfter(dateBeforeStoring).build());
     Assert.assertEquals(1, search.size());
 
-    search = oaiPmhDatabase.search(query().modifiedAfter(dateBeforeStoring).build(), null);
+    search = oaiPmhDatabase.search(query().modifiedAfter(dateBeforeStoring).build());
     Assert.assertEquals(1, search.size());
 
     Date dateBeforeDeletion = new Date();
@@ -198,10 +197,10 @@ public class OaiPmhPersistenceTest {
 
     Thread.sleep(10);
 
-    search = oaiPmhDatabase.search(query().modifiedAfter(new Date()).build(), null);
+    search = oaiPmhDatabase.search(query().modifiedAfter(new Date()).build());
     Assert.assertEquals(0, search.size());
 
-    search = oaiPmhDatabase.search(query().modifiedAfter(dateBeforeDeletion).build(), null);
+    search = oaiPmhDatabase.search(query().modifiedAfter(dateBeforeDeletion).build());
     Assert.assertEquals(1, search.size());
   }
 
@@ -211,14 +210,14 @@ public class OaiPmhPersistenceTest {
     MediaPackage mp2 = (MediaPackage) mp1.clone();
     mp2.setIdentifier(IdBuilderFactory.newInstance().newIdBuilder().createNew());
     oaiPmhDatabase.store(mp2, REPOSITORY_ID_2);
-    SearchResult search = oaiPmhDatabase.search(query().limit(2).build(), null);
+    SearchResult search = oaiPmhDatabase.search(query().limit(2).build());
     Assert.assertEquals(2, search.size());
 
-    search = oaiPmhDatabase.search(query().limit(1).build(), null);
+    search = oaiPmhDatabase.search(query().limit(1).build());
     Assert.assertEquals(1, search.size());
     Assert.assertEquals(mp1.getIdentifier().toString(), search.getItems().get(0).getId());
 
-    search = oaiPmhDatabase.search(query().offset(1).build(), null);
+    search = oaiPmhDatabase.search(query().offset(1).build());
     Assert.assertEquals(1, search.size());
     Assert.assertEquals(mp2.getIdentifier().toString(), search.getItems().get(0).getId());
   }
@@ -228,7 +227,7 @@ public class OaiPmhPersistenceTest {
     oaiPmhDatabase.store(mp1, REPOSITORY_ID_1);
     int count = 0;
     for (SearchResultItem searchResultItem : oaiPmhDatabase
-            .search(queryRepo(REPOSITORY_ID_1).mediaPackageId(mp1).build(), null).getItems()) {
+            .search(queryRepo(REPOSITORY_ID_1).mediaPackageId(mp1).build()).getItems()) {
       count++;
       Assert.assertNotNull(searchResultItem.getMediaPackage());
       Assert.assertNotNull(searchResultItem.getMediaPackage().getElementById("catalog-1"));
@@ -239,7 +238,7 @@ public class OaiPmhPersistenceTest {
     oaiPmhDatabase.store(mp1, REPOSITORY_ID_1);
     count = 0;
     for (SearchResultItem searchResultItem : oaiPmhDatabase
-            .search(queryRepo(REPOSITORY_ID_1).mediaPackageId(mp1).build(), null).getItems()) {
+            .search(queryRepo(REPOSITORY_ID_1).mediaPackageId(mp1).build()).getItems()) {
       count++;
       Assert.assertNotNull(searchResultItem.getMediaPackage());
       Assert.assertNull(searchResultItem.getMediaPackage().getElementById("catalog-1"));
@@ -258,7 +257,7 @@ public class OaiPmhPersistenceTest {
 
     int count = 0;
     for (SearchResultItem searchResultItem : oaiPmhDatabase
-            .search(queryRepo(REPOSITORY_ID_1).mediaPackageId(mp1).build(), null).getItems()) {
+            .search(queryRepo(REPOSITORY_ID_1).mediaPackageId(mp1).build()).getItems()) {
       count++;
       Assert.assertNotNull(searchResultItem.getMediaPackage());
       MediaPackageElement mpe = searchResultItem.getMediaPackage().getElementById("catalog-1");

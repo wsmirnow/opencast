@@ -27,6 +27,8 @@ import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.util.data.Option;
 
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Query builder. */
 public class QueryBuilder {
@@ -38,6 +40,8 @@ public class QueryBuilder {
   private Option<Date> modifiedBefore = none();
   private Option<Integer> limit = none();
   private Option<Integer> offset = none();
+  private Option<String> setSpec = none();
+  private Map<String, Map<String, String>> setDefinition = new HashMap<>();
   private boolean subsequentRequest = false;
 
   public static QueryBuilder query() {
@@ -134,6 +138,18 @@ public class QueryBuilder {
     return this;
   }
 
+  public QueryBuilder setDefinitions(Map<String, Map<String, String>> setDef) {
+    this.setDefinition = setDef;
+    return this;
+  }
+
+  public QueryBuilder setSpec(String setSpec) {
+    if (setSpec != null) {
+      this.setSpec = some(setSpec);
+    }
+    return this;
+  }
+
   /** Create the query. */
   public Query build() {
     final Option<String> mediaPackageId = this.mediaPackageId;
@@ -144,6 +160,8 @@ public class QueryBuilder {
     final Option<Date> modifiedBefore = this.modifiedBefore;
     final Option<Integer> limit = this.limit;
     final Option<Integer> offset = this.offset;
+    final Option<String> setSpec = this.setSpec;
+    final Map<String, Map<String, String>> setDefinition = this.setDefinition;
     final boolean subsequentRequest = this.subsequentRequest;
 
     return new Query() {
@@ -177,6 +195,16 @@ public class QueryBuilder {
 
       @Override public Option<Integer> getOffset() {
         return offset;
+      }
+
+      @Override
+      public Map<String, Map<String, String>> getSetDefinition() {
+        return setDefinition;
+      }
+
+      @Override
+      public Option<String> getSetSpec() {
+        return setSpec;
       }
 
       @Override public boolean isSubsequentRequest() {

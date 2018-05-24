@@ -150,7 +150,7 @@ public class OaiPmhUpdatedEventHandler implements ManagedService {
       }
 
       SearchResult result = oaiPmhPersistence.search(QueryBuilder.query().mediaPackageId(snapshotMp)
-              .isDeleted(false).build(), null);
+              .isDeleted(false).build());
       for (SearchResultItem searchResultItem : result.getItems()) {
         try {
           Job job = oaiPmhPublicationService

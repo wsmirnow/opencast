@@ -201,12 +201,15 @@ public abstract class OaiPmhRepository implements ManagedService {
       return createBadArgumentResponse(p);
     } else {
       for (final MetadataProvider metadataProvider : p.getMetadataPrefix().bind(getMetadataProvider)) {
-        Map<String, String> setDef = null;
-        if (p.getSet().isSome()) {
-          setDef = sets.get(p.getSet().get());
+        if (p.getSet().isSome() && !sets.containsKey(p.getSet().get())) {
+          // If there is no set specification, immediately return a no result response
+          return createNoRecordsMatchResponse(p);
         }
         final SearchResult res = getPersistence()
-                .search(queryRepo(getRepositoryId()).mediaPackageId(p.getIdentifier()).build(), setDef);
+                .search(queryRepo(getRepositoryId()).mediaPackageId(p.getIdentifier())
+                                                    .setDefinitions(sets)
+                                                    .setSpec(p.getSet().getOrElseNull())
+                                                    .build());
         final List<SearchResultItem> items = res.getItems();
         switch (items.size()) {
           case 0:
@@ -261,7 +264,7 @@ public abstract class OaiPmhRepository implements ManagedService {
 
   private XmlGen handleListMetadataFormats(final Params p) {
     for (String id : p.getIdentifier()) {
-      final SearchResult res = getPersistence().search(queryRepo(getRepositoryId()).mediaPackageId(id).build(), null);
+      final SearchResult res = getPersistence().search(queryRepo(getRepositoryId()).mediaPackageId(id).build());
       if (res.getItems().size() != 1)
         return createIdDoesNotExistResponse(p);
     }
@@ -494,31 +497,31 @@ public abstract class OaiPmhRepository implements ManagedService {
           final Option<String>[] set = new Option[]{p.getSet()};
           if (!resumptionTokenExists) {
             // start a new query
-            Map<String, String> setDef = null;
-            if (set[0].isSome()) {
-              setDef = sets.get(set[0].get());
+            if (p.getSet().isSome() && !sets.containsKey(p.getSet().get())) {
+              // If there is no set specification, immediately return a no result response
+              return createNoRecordsMatchResponse(p);
             }
             result = getPersistence().search(
                     queryRepo(getRepositoryId())
+                            .setDefinitions(sets)
+                            .setSpec(p.getSet().getOrElseNull())
                             .modifiedAfter(from)
                             .modifiedBefore(until)
-                            .limit(getResultLimit()).build(), setDef);
+                            .limit(getResultLimit()).build());
           } else {
             // resume query
             result = getSavedQuery(p.getResumptionToken().get()).fold(new Option.Match<ResumableQuery, SearchResult>() {
               @Override
               public SearchResult some(ResumableQuery rq) {
                 set[0] = rq.getSet();
-                Map<String, String> setDef = null;
-                if (set[0].isSome()) {
-                  setDef = sets.get(set[0].get());
-                }
                 return getPersistence().search(
                         queryRepo(getRepositoryId())
+                                .setDefinitions(sets)
+                                .setSpec(p.getSet().getOrElseNull())
                                 .modifiedAfter(rq.getLastResult())
                                 .modifiedBefore(rq.getUntil())
                                 .limit(getResultLimit())
-                                .subsequentRequest(true).build(), setDef);
+                                .subsequentRequest(true).build());
               }
 
               @Override
