@@ -39,6 +39,8 @@ import org.opencastproject.oaipmh.util.XmlGen;
 import org.opencastproject.util.data.Function;
 import org.opencastproject.util.data.Option;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
@@ -55,6 +57,8 @@ import javax.xml.XMLConstants;
 public abstract class OaiXmlGen extends XmlGen {
 
   protected OaiPmhRepository repository;
+
+  private final Logger logger = LoggerFactory.getLogger(OaiXmlGen.class);
 
   /**
    * Create a new OaiXmlGen for a certain repository.
@@ -193,17 +197,21 @@ public abstract class OaiXmlGen extends XmlGen {
    * Create the header element for a result item.
    */
   Element header(final SearchResultItem item) {
-    // todo output setSpec
     // How to determine the media type?
     // There is a field oc_mediatype in the index but this one distinguishes
     // only audioVisual and series.
+    Element header = $e("header",
+                        $eTxt("identifier", item.getId()),
+                        $eTxt("datestamp", repository.toSupportedGranularity(item.getModificationDate())));
     if (item.isDeleted()) {
-      return $e("header", $a("status", "deleted"), $eTxt("identifier", item.getId()),
-                $eTxt("datestamp", repository.toSupportedGranularity.apply(item.getModificationDate())));
-    } else {
-      return $e("header", $eTxt("identifier", item.getId()),
-                $eTxt("datestamp", repository.toSupportedGranularity(item.getModificationDate())));
+      header.setAttribute("status", "deleted");
     }
+    header.appendChild($eTxt("identifier", item.getId()));
+    header.appendChild($eTxt("datestamp", repository.toSupportedGranularity(item.getModificationDate())));
+    for (String setSpec: item.getSetSpecs()) {
+      header.appendChild($eTxt("setSpec", setSpec));
+    }
+    return header;
   }
 
   /**

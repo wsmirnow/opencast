@@ -289,10 +289,12 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
           if (StringUtils.isNotEmpty(contains)) {
             if (element.getXml().contains(contains)) {
               filteredItems.add(item);
+              item.addSetSpec(query.getSetSpec().get());
             }
           } else {
             if (!element.getXml().contains(containsnot)) {
               filteredItems.add(item);
+              item.addSetSpec(query.getSetSpec().get());
             }
           }
           break;

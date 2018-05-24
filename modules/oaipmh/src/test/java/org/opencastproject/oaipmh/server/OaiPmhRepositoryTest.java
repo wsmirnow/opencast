@@ -233,12 +233,12 @@ public class OaiPmhRepositoryTest {
   @Test
   @SuppressWarnings("unchecked")
   public void testResumption() throws Exception {
-    List<SearchResultItem> items1 = new ArrayList<SearchResultItem>();
+    List<SearchResultItem> items1 = new ArrayList<>();
     items1.add(searchResultItem("id-1", utcDate(2011, 5, 10), false));
     items1.add(searchResultItem("id-2", utcDate(2011, 5, 11), false));
     items1.add(searchResultItem("id-3", utcDate(2011, 5, 12), false));
 
-    List<SearchResultItem> items2 = new ArrayList<SearchResultItem>();
+    List<SearchResultItem> items2 = new ArrayList<>();
     items2.add(searchResultItem("id-4", utcDate(2011, 5, 13), false));
     items2.add(searchResultItem("id-5", utcDate(2011, 5, 14), false));
 
@@ -424,6 +424,7 @@ public class OaiPmhRepositoryTest {
     EasyMock.expect(item.getId()).andReturn(id).anyTimes();
     EasyMock.expect(item.isDeleted()).andReturn(deleted).anyTimes();
     EasyMock.expect(item.getMediaPackageXml()).andReturn(mpXml).anyTimes();
+    EasyMock.expect(item.getSetSpecs()).andReturn(new ArrayList<>()).anyTimes();
 
     SearchResultElementItem episodeDcElement = EasyMock.createNiceMock(SearchResultElementItem.class);
     EasyMock.expect(episodeDcElement.getType()).andReturn("catalog").anyTimes();
