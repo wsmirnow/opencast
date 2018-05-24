@@ -262,42 +262,30 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
         typedQuery.setFirstResult(startPosition);
 
       SearchResult result = createSearchResult(typedQuery);
-      // Return immediately if no sets are defined
-      if (query.getSetSpec().isNone()) {
-        return result;
-      }
-      Map<String, String> setDef = query.getSetDefinition().get(query.getSetSpec().get());
-      if (setDef == null) {
-        // return empty result if there is no definition for a requested setSpec
+
+      // return empty result if there is no definition for a requested setSpec
+      if (query.getSetSpec().isSome() && !query.getSetDefinition().containsKey(query.getSetSpec().get())) {
         return new SearchResultImpl(result.getOffset(), result.getLimit(), new ArrayList<>());
       }
-      String flavor = setDef.get("flavor");
-      String type = setDef.get("type");
-      String contains = setDef.get("contains");
-      String containsnot = setDef.get("containsnot");
+
+      final String requestSetSpec = query.getSetSpec().getOrElseNull();
       final List<SearchResultItem> filteredItems = new ArrayList<>();
-      for (SearchResultItem item: result.getItems()) {
-        for (SearchResultElementItem element: item.getElements()) {
-          logger.debug("flavor: {}", element.getFlavor());
-          logger.debug("type: {}", element.getType());
-          logger.debug("XML: {}", element.getXml());
-          // Check if type and flavor match our filter rule.
-          // We only include items with matching elements.
-          if (!element.getFlavor().equals(flavor) || !element.getType().equals(type)) {
-            continue;
-          }
-          if (StringUtils.isNotEmpty(contains)) {
-            if (element.getXml().contains(contains)) {
-              filteredItems.add(item);
-              item.addSetSpec(query.getSetSpec().get());
-            }
-          } else {
-            if (!element.getXml().contains(containsnot)) {
-              filteredItems.add(item);
-              item.addSetSpec(query.getSetSpec().get());
+      for (SearchResultItem item : result.getItems()) {
+        for (Map.Entry<String, Map<String, String>> set: query.getSetDefinition().entrySet()) {
+          String setSpec = set.getKey();
+          Map<String, String> setDef = set.getValue();
+          for (SearchResultElementItem element : item.getElements()) {
+            if (matchSetDef(setSpec, setDef, element)) {
+              if (setSpec.equals(requestSetSpec)) {
+                filteredItems.add(item);
+              }
+              item.addSetSpec(setSpec);
             }
           }
-          break;
+        }
+        // Always add item if no set was requested
+        if (requestSetSpec == null) {
+          filteredItems.add(item);
         }
       }
       return new SearchResultImpl(result.getOffset(), result.getLimit(), filteredItems);
@@ -305,6 +293,33 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
       if (em != null)
         em.close();
     }
+  }
+
+  private boolean matchSetDef(String setSpec, Map<String, String> setDef, SearchResultElementItem element) {
+    final String flavor = setDef.get("flavor");
+    final String type = setDef.get("type");
+    final String contains = setDef.get("contains");
+    final String containsnot = setDef.get("containsnot");
+    logger.debug("flavor: {}", element.getFlavor());
+    logger.debug("type: {}", element.getType());
+    logger.debug("XML: {}", element.getXml());
+    // Check if type and flavor match our filter rule.
+    // We only include items with matching elements.
+    if (!element.getFlavor().equals(flavor) || !element.getType().equals(type)) {
+      return false;
+    }
+
+    // Check contains if the field is configured
+    if (StringUtils.isNotEmpty(contains)) {
+      return element.getXml().contains(contains);
+    }
+
+    // Check containsnot if the field is configured
+    if (StringUtils.isNotEmpty(containsnot)) {
+      return !element.getXml().contains(containsnot);
+    }
+
+    return false;
   }
 
   /**
