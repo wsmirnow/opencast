@@ -84,7 +84,6 @@ public class OaiPmhRepositoryPersistenceTest {
   /** Turn an XmlGen into a Source. */
   private static Source s(XmlGen g) {
     final Source s = new DOMSource(g.generate());
-    print(s);
     return s;
   }
 
