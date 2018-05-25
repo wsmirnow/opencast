@@ -206,8 +206,6 @@ public abstract class OaiXmlGen extends XmlGen {
     if (item.isDeleted()) {
       header.setAttribute("status", "deleted");
     }
-    header.appendChild($eTxt("identifier", item.getId()));
-    header.appendChild($eTxt("datestamp", repository.toSupportedGranularity(item.getModificationDate())));
     for (String setSpec: item.getSetSpecs()) {
       header.appendChild($eTxt("setSpec", setSpec));
     }
