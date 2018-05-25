@@ -102,6 +102,14 @@ public abstract class OaiPmhRepository implements ManagedService {
 
   private Map<String, Map<String, String>> sets = new HashMap<>();
 
+  /**
+   * Parse service configuration file.
+   *
+   * @param properties
+   *        Service configuration as dictionary
+   * @throws ConfigurationException
+   *        If there is a problem within ght configuration
+   */
   @Override
   public void updated(Dictionary<String, ?> properties) throws ConfigurationException {
     if (properties == null) {
@@ -115,16 +123,32 @@ public abstract class OaiPmhRepository implements ManagedService {
       String propKey = enumeration.nextElement();
       Matcher matcher = keyPattern.matcher(propKey);
       if (matcher.find()) {
-        String name = matcher.group(1);
+        String setSpec = matcher.group(1);
         String key = matcher.group(2);
         String value = (String) properties.get(propKey);
-        if (!sets.containsKey(name)) {
-          sets.put(name, new HashMap<>());
+        if (!sets.containsKey(setSpec)) {
+          sets.put(setSpec, new HashMap<>());
         }
-         sets.get(name).put(key, value);
-        logger.warn("set({}): {} -> {}", name, key, value);
+        sets.get(setSpec).put(key, value);
+        logger.debug("set({}): {} -> {}", setSpec, key, value);
       }
     }
+
+    // Check for proper set configuration
+    for (Map.Entry<String, Map<String, String>> set: sets.entrySet()) {
+      for (String key: new String[]{"name", "type", "flavor"}) {
+        if (!set.getValue().containsKey(key)) {
+          throw new ConfigurationException(String.format("set.%s.%s", set.getKey(), key),
+                                           String.format("Configuration for '%s' is missing '%s'", set.getKey(), key));
+        }
+      }
+      // we also need contains *or* containsnot
+      if (!set.getValue().containsKey("contains") && !set.getValue().containsKey("containsnot")) {
+        throw new ConfigurationException(String.format("set.%s.*", set.getKey()),
+                String.format("Configuration for '%s' is missing 'contains' and 'containsnot'", set.getKey()));
+      }
+    }
+
   }
 
   /**
@@ -332,9 +356,9 @@ public abstract class OaiPmhRepository implements ManagedService {
       public Element create() {
         List<Node> setNodes = new LinkedList<>();
         for (Map.Entry<String, Map<String, String>> set: sets.entrySet()) {
-          String name = set.getKey();
-          String description = set.getValue().get("description");
-          setNodes.add($e("set", $eTxt("setSpec", name), $eTxt("setName", description)));
+          String setSpec = set.getKey();
+          String name = set.getValue().get("name");
+          setNodes.add($e("set", $eTxt("setSpec", setSpec), $eTxt("setName", name)));
         }
         return oai(request(), verb(setNodes));
       }
