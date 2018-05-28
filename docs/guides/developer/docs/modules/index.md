@@ -16,3 +16,4 @@ or subsystems of Opencast.
     - [Create a new Plugin](player/plugin.development.md)
     - [Testing](player/testing.md)
 - [Stream Security](stream-security.md)
+- [Retry Strategies](retry-strategies.md)

@@ -70,6 +70,7 @@ pages:
       - Testing: 'modules/player/testing.md'
    - Stream Security: 'modules/stream-security.md'
    - OAI-PMH: 'modules/oaipmh.md'
+   - Retry Strategies: 'modules/retry-strategies.md'
 - Infrastructure:
    - Overview: 'infrastructure/index.md'
    - Notes: 'infrastructure/notes.md'
