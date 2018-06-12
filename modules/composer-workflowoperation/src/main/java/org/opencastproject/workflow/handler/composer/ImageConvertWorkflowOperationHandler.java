@@ -1,0 +1,206 @@
+/**
+ * Licensed to The Apereo Foundation under one or more contributor license
+ * agreements. See the NOTICE file distributed with this work for additional
+ * information regarding copyright ownership.
+ *
+ *
+ * The Apereo Foundation licenses this file to you under the Educational
+ * Community License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License
+ * at:
+ *
+ *   http://opensource.org/licenses/ecl2.txt
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ *
+ */
+
+package org.opencastproject.workflow.handler.composer;
+
+import org.opencastproject.composer.api.ComposerService;
+import org.opencastproject.composer.api.EncodingProfile;
+import org.opencastproject.job.api.Job;
+import org.opencastproject.job.api.JobContext;
+import org.opencastproject.mediapackage.Attachment;
+import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElementFlavor;
+import org.opencastproject.mediapackage.MediaPackageElementParser;
+import org.opencastproject.mediapackage.MediaPackageException;
+import org.opencastproject.mediapackage.selector.AttachmentSelector;
+import org.opencastproject.util.NotFoundException;
+import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.WorkflowInstance;
+import org.opencastproject.workflow.api.WorkflowOperationException;
+import org.opencastproject.workflow.api.WorkflowOperationInstance;
+import org.opencastproject.workflow.api.WorkflowOperationResult;
+import org.opencastproject.workspace.api.Workspace;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
+
+public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperationHandler {
+
+  private static final Logger logger = LoggerFactory.getLogger(ImageConvertWorkflowOperationHandler.class);
+
+  /** The configuration options for this handler */
+  private static final SortedMap<String, String> CONFIG_OPTIONS;
+
+  static {
+    CONFIG_OPTIONS = new TreeMap<String, String>();
+    CONFIG_OPTIONS.put("source-flavors", "The source image(s) flavor. Multiple values can be separated by ','.");
+    CONFIG_OPTIONS.put("source-tags", "The source image(s) tags");
+    CONFIG_OPTIONS.put("tags-and-flavors", "An boolean value wether so select elements with tags and flavors "
+            + "(then set this option to true) or either tags or flavors (then set this option to false). "
+            + "Default value is false.");
+    CONFIG_OPTIONS.put("target-flavor", "The flavor to apply to the converted image(s).");
+    CONFIG_OPTIONS.put("target-tags", "The tags to apply to the converted image(s).");
+    CONFIG_OPTIONS.put("target-filename-pattern", "The pattern to apply to file name of the converted images");
+    CONFIG_OPTIONS.put("encoding-profiles", "The encoding profile(s) to use, separated by ','.");
+  }
+
+  /** The composer service */
+  private ComposerService composerService = null;
+
+  /** The workspace */
+  private Workspace workspace = null;
+
+  /**
+   * {@inheritDoc}
+   *
+   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
+   */
+  @Override
+  public SortedMap<String, String> getConfigurationOptions() {
+    return CONFIG_OPTIONS;
+  }
+
+  @Override
+  public WorkflowOperationResult start(WorkflowInstance workflowInstance, JobContext context) throws WorkflowOperationException {
+    WorkflowOperationInstance operation = workflowInstance.getCurrentOperation();
+    String sourceFlavorOption = StringUtils.trimToNull(operation.getConfiguration("source-flavor"));
+    String sourceFlavorsOption = StringUtils.trimToNull(operation.getConfiguration("source-flavors"));
+    String sourceTagsOption = StringUtils.trimToNull(operation.getConfiguration("source-tags"));
+    String targetFlavorOption = StringUtils.trimToNull(operation.getConfiguration("target-flavor"));
+    String targetTagsOption = StringUtils.trimToNull(operation.getConfiguration("target-tags"));
+    String targetFileNamePatternOption = StringUtils.trimToNull(operation.getConfiguration("target-filename-pattern"));
+    String encodingProfileOption = StringUtils.trimToNull(operation.getConfiguration("encoding-profile"));
+    boolean tagsAndFlavorsOption = Boolean
+            .parseBoolean(StringUtils.trimToNull(operation.getConfiguration("tags-and-flavors")));
+
+    MediaPackage mediaPackage = workflowInstance.getMediaPackage();
+
+    // Make sure either one of tags or flavors are provided
+    if (StringUtils.isBlank(sourceFlavorOption) && StringUtils.isBlank(sourceFlavorsOption)
+            && StringUtils.isBlank(sourceTagsOption)) {
+      logger.info("No source tags or flavors have been specified, not matching anything");
+      return createResult(mediaPackage, WorkflowOperationResult.Action.CONTINUE);
+    }
+
+    // Target flavor
+    MediaPackageElementFlavor targetFlavor = null;
+    if (StringUtils.isNotBlank(targetFlavorOption)) {
+      try {
+        targetFlavor = MediaPackageElementFlavor.parseFlavor(targetFlavorOption);
+      } catch (IllegalArgumentException e) {
+        throw new WorkflowOperationException("Target flavor '" + targetFlavorOption + "' is malformed");
+      }
+    }
+
+    List<String> profiles = new ArrayList<>();
+    for (String encodingProfileId : asList(encodingProfileOption)) {
+      EncodingProfile profile = composerService.getProfile(encodingProfileId);
+      if (profile == null)
+        throw new WorkflowOperationException("Encoding profile '" + encodingProfileId + "' was not found");
+      // just test if the profile exists, we only need the profile id for further work
+      profiles.add(encodingProfileId);
+    }
+
+    // Make sure there is at least one profile
+    if (profiles.isEmpty())
+      throw new WorkflowOperationException("No encoding profile was specified");
+
+    AttachmentSelector attachmentSelector = new AttachmentSelector();
+    for (String sourceFlavor : asList(sourceFlavorsOption)) {
+      attachmentSelector.addFlavor(sourceFlavor);
+    }
+    for (String sourceFlavor : asList(sourceFlavorOption)) {
+      attachmentSelector.addFlavor(sourceFlavor);
+    }
+    for (String sourceTag : asList(sourceTagsOption)) {
+      attachmentSelector.addTag(sourceTag);
+    }
+
+    // Look for elements matching the tag
+    Collection<Attachment> sourceElements = attachmentSelector.select(mediaPackage, tagsAndFlavorsOption);
+
+    Map<Job, Attachment> jobs = new Hashtable<>();
+    try {
+      for (Attachment sourceElement : sourceElements) {
+        Job job = composerService.convertImage(sourceElement, (String[]) profiles.toArray());
+        jobs.put(job, sourceElement);
+      }
+      if (!waitForStatus((Job[]) jobs.keySet().toArray()).isSuccess()) {
+        throw new WorkflowOperationException("At least one image conversation job does not succeeded.");
+      }
+      for (Job job : jobs.keySet()) {
+        List<Attachment> targetElements =
+                (List<Attachment>) MediaPackageElementParser.getArrayFromXml(job.getPayload());
+        for (Attachment targetElement : targetElements) {
+          String targetFileName = getTargetFileName(targetElement, targetFileNamePatternOption);
+          URI newTargetElementUri = workspace.moveTo(targetElement.getURI(), mediaPackage.getIdentifier().compact(),
+                  targetElement.getIdentifier(), targetFileName);
+          targetElement.setURI(newTargetElementUri);
+          // TODO set target flavor/tags
+          mediaPackage.addDerived(targetElement, jobs.get(job));
+        }
+      }
+      return createResult(mediaPackage, WorkflowOperationResult.Action.CONTINUE);
+    } catch (Throwable t) {
+      //TODO cleanup workspace
+      if (t instanceof WorkflowOperationException) {
+        throw (WorkflowOperationException) t;
+      } else {
+        throw new WorkflowOperationException("Convert image operation failed", t);
+      }
+    }
+  }
+
+  private String getTargetFileName(Attachment targetElement, String targetFileNamePatternOption) {
+    return null;
+  }
+
+  private void cleanupWorkspace(Collection<Job> jobs) {
+    for (Job job : jobs) {
+      try {
+        List<Attachment> targetElements =
+                (List<Attachment>) MediaPackageElementParser.getArrayFromXml(job.getPayload());
+        for (Attachment targetElement : targetElements) {
+          try {
+            workspace.delete(targetElement.getURI());
+          } catch (NotFoundException ex) {
+            logger.trace("The image file {} not found", targetElement, ex);
+          } catch (IOException ex) {
+            logger.warn("Unable to delete image file {} from workspace", targetElement, ex);
+          }
+        }
+      } catch (MediaPackageException ex) {
+        logger.debug("Unable to parse job payload from job {}", job.getId());
+      }
+    }
+  }
+}
