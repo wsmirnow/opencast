@@ -118,9 +118,13 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
     String sourceFlavorsOption = StringUtils.trimToNull(operation.getConfiguration("source-flavors"));
     String sourceTagsOption = StringUtils.trimToNull(operation.getConfiguration("source-tags"));
     String targetFlavorOption = StringUtils.trimToNull(operation.getConfiguration("target-flavor"));
+    if (targetFlavorOption == null)
+      targetFlavorOption = StringUtils.trimToNull(operation.getConfiguration("target-flavors"));
     String targetTagsOption = StringUtils.trimToNull(operation.getConfiguration("target-tags"));
 //    String targetFileNamePatternOption = StringUtils.trimToNull(operation.getConfiguration("target-filename-pattern"));
     String encodingProfileOption = StringUtils.trimToNull(operation.getConfiguration("encoding-profile"));
+    if (encodingProfileOption == null)
+      encodingProfileOption = StringUtils.trimToNull(operation.getConfiguration("encoding-profiles"));
     boolean tagsAndFlavorsOption = Boolean
             .parseBoolean(StringUtils.trimToNull(operation.getConfiguration("tags-and-flavors")));
 

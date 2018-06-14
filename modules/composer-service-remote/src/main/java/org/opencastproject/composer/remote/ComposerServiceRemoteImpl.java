@@ -39,6 +39,7 @@ import org.opencastproject.mediapackage.Track;
 import org.opencastproject.serviceregistry.api.RemoteBase;
 import org.opencastproject.util.data.Option;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
@@ -303,12 +304,12 @@ public class ComposerServiceRemoteImpl extends RemoteBase implements ComposerSer
    *      java.lang.String)
    */
   @Override
-  public Job convertImage(Attachment image, String profileId) throws EncoderException, MediaPackageException {
+  public Job convertImage(Attachment image, String... profileId) throws EncoderException, MediaPackageException {
     HttpPost post = new HttpPost("/convertimage");
     try {
       List<BasicNameValuePair> params = new ArrayList<BasicNameValuePair>();
       params.add(new BasicNameValuePair("sourceImage", MediaPackageElementParser.getAsXml(image)));
-      params.add(new BasicNameValuePair("profileId", profileId));
+      params.add(new BasicNameValuePair("profileId", StringUtils.join(profileId, ',')));
       post.setEntity(new UrlEncodedFormEntity(params));
     } catch (Exception e) {
       throw new EncoderException(e);
