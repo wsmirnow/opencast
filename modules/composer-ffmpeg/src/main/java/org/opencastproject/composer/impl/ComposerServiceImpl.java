@@ -32,6 +32,7 @@ import org.opencastproject.composer.api.ComposerService;
 import org.opencastproject.composer.api.EncoderException;
 import org.opencastproject.composer.api.EncodingProfile;
 import org.opencastproject.composer.api.LaidOutElement;
+import org.opencastproject.composer.api.VideoClip;
 import org.opencastproject.composer.layout.Dimension;
 import org.opencastproject.composer.layout.Layout;
 import org.opencastproject.composer.layout.Serializer;
@@ -45,6 +46,7 @@ import org.opencastproject.mediapackage.Attachment;
 import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageElementBuilder;
 import org.opencastproject.mediapackage.MediaPackageElementBuilderFactory;
+import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.Track;
@@ -1343,9 +1345,9 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
           serialized = MediaPackageElementParser.getArrayAsXml(resultingElements);
           break;
         case ImageConversion:
-          String[] encodingProfiles = StringUtils.split(arguments.get(0), ',');
+          String[] encodingProfilesArr = StringUtils.split(arguments.get(0), ',');
           Attachment sourceImage = (Attachment) MediaPackageElementParser.getFromXml(arguments.get(1));
-          List<Attachment> convertedImages = convertImage(job, sourceImage, encodingProfiles);
+          List<Attachment> convertedImages = convertImage(job, sourceImage, encodingProfilesArr);
           serialized = MediaPackageElementParser.getArrayAsXml(convertedImages);
           break;
         case Mux:
