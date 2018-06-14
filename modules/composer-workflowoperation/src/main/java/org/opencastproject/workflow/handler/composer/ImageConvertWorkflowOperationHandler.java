@@ -32,6 +32,7 @@ import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.selector.AttachmentSelector;
 import org.opencastproject.util.NotFoundException;
+import org.opencastproject.util.PathSupport;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
@@ -39,6 +40,7 @@ import org.opencastproject.workflow.api.WorkflowOperationInstance;
 import org.opencastproject.workflow.api.WorkflowOperationResult;
 import org.opencastproject.workspace.api.Workspace;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +71,7 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
             + "Default value is false.");
     CONFIG_OPTIONS.put("target-flavor", "The flavor to apply to the converted image(s).");
     CONFIG_OPTIONS.put("target-tags", "The tags to apply to the converted image(s).");
-    CONFIG_OPTIONS.put("target-filename-pattern", "The pattern to apply to file name of the converted images");
+//    CONFIG_OPTIONS.put("target-filename-pattern", "The pattern to apply to file name of the converted images");
     CONFIG_OPTIONS.put("encoding-profiles", "The encoding profile(s) to use, separated by ','.");
   }
 
@@ -78,6 +80,26 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
 
   /** The workspace */
   private Workspace workspace = null;
+
+  /**
+   * Callback for the OSGi declarative services configuration.
+   *
+   * @param composerService
+   *          the composer service
+   */
+  protected void setComposerService(ComposerService composerService) {
+    this.composerService = composerService;
+  }
+
+  /**
+   * Callback for declarative services configuration that will introduce us to the local workspace service.
+   *
+   * @param workspace
+   *          an instance of the workspace
+   */
+  public void setWorkspace(Workspace workspace) {
+    this.workspace = workspace;
+  }
 
   /**
    * {@inheritDoc}
@@ -97,7 +119,7 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
     String sourceTagsOption = StringUtils.trimToNull(operation.getConfiguration("source-tags"));
     String targetFlavorOption = StringUtils.trimToNull(operation.getConfiguration("target-flavor"));
     String targetTagsOption = StringUtils.trimToNull(operation.getConfiguration("target-tags"));
-    String targetFileNamePatternOption = StringUtils.trimToNull(operation.getConfiguration("target-filename-pattern"));
+//    String targetFileNamePatternOption = StringUtils.trimToNull(operation.getConfiguration("target-filename-pattern"));
     String encodingProfileOption = StringUtils.trimToNull(operation.getConfiguration("encoding-profile"));
     boolean tagsAndFlavorsOption = Boolean
             .parseBoolean(StringUtils.trimToNull(operation.getConfiguration("tags-and-flavors")));
@@ -158,30 +180,72 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
         throw new WorkflowOperationException("At least one image conversation job does not succeeded.");
       }
       for (Job job : jobs.keySet()) {
+        Attachment sourceElement = jobs.get(job);
         List<Attachment> targetElements =
                 (List<Attachment>) MediaPackageElementParser.getArrayFromXml(job.getPayload());
         for (Attachment targetElement : targetElements) {
-          String targetFileName = getTargetFileName(targetElement, targetFileNamePatternOption);
+          String targetFileName = PathSupport.toSafeName(FilenameUtils.getName(targetElement.getURI().getPath()));
           URI newTargetElementUri = workspace.moveTo(targetElement.getURI(), mediaPackage.getIdentifier().compact(),
                   targetElement.getIdentifier(), targetFileName);
           targetElement.setURI(newTargetElementUri);
-          // TODO set target flavor/tags
+          targetElement.setChecksum(null);
+
+          // set flavor on target element
+          if (targetFlavor != null) {
+            targetElement.setFlavor(targetFlavor);
+            if (StringUtils.equalsAny("*", targetFlavor.getType())) {
+              targetElement.setFlavor(MediaPackageElementFlavor.flavor(
+                      sourceElement.getFlavor().getType(), targetElement.getFlavor().getSubtype()));
+            }
+            if (StringUtils.equalsAny("*", targetFlavor.getSubtype())) {
+              targetElement.setFlavor(MediaPackageElementFlavor.flavor(
+                      targetElement.getFlavor().getType(), sourceElement.getFlavor().getSubtype()));
+            }
+          }
+          // set tags on target element
+          List<String> fixedTags = new ArrayList<>();
+          List<String> additionalTags = new ArrayList<>();
+          List<String> removingTags = new ArrayList<>();
+          for (String targetTag : asList(targetTagsOption)) {
+            if (!StringUtils.startsWithAny(targetTag, "+", "-")) {
+              if (additionalTags.size() > 0 || removingTags.size() > 0) {
+                logger.warn("You may not mix fixed tags and tag changes. "
+                        + "Please review target-tags option on image-convert operation of your workflow definition. "
+                        + "The tag {} is not prefixed with '+' or '-'.", targetTag);
+              }
+              fixedTags.add(targetTag);
+            } else if (StringUtils.startsWith(targetTag, "+")) {
+              additionalTags.add(StringUtils.substring(targetTag, 1));
+            } else if (StringUtils.startsWith(targetTag, "-")) {
+              removingTags.add(StringUtils.substring(targetTag, 1));
+            }
+          }
+          targetElement.clearTags();
+          if (fixedTags.isEmpty() && (!additionalTags.isEmpty() || !removingTags.isEmpty())) {
+            for (String tag : sourceElement.getTags()) {
+              targetElement.addTag(tag);
+            }
+          }
+          for (String targetTag : fixedTags) {
+            targetElement.addTag(targetTag);
+          }
+          for (String additionalTag : additionalTags) {
+            targetElement.addTag(additionalTag);
+          }
+          for (String removingTag : removingTags) {
+            targetElement.removeTag(removingTag);
+          }
           mediaPackage.addDerived(targetElement, jobs.get(job));
         }
       }
       return createResult(mediaPackage, WorkflowOperationResult.Action.CONTINUE);
+    } catch (WorkflowOperationException ex) {
+      throw ex;
     } catch (Throwable t) {
-      //TODO cleanup workspace
-      if (t instanceof WorkflowOperationException) {
-        throw (WorkflowOperationException) t;
-      } else {
-        throw new WorkflowOperationException("Convert image operation failed", t);
-      }
+      throw new WorkflowOperationException("Convert image operation failed", t);
+    } finally {
+      cleanupWorkspace(jobs.keySet());
     }
-  }
-
-  private String getTargetFileName(Attachment targetElement, String targetFileNamePatternOption) {
-    return null;
   }
 
   private void cleanupWorkspace(Collection<Job> jobs) {
@@ -199,7 +263,7 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
           }
         }
       } catch (MediaPackageException ex) {
-        logger.debug("Unable to parse job payload from job {}", job.getId());
+        logger.debug("Unable to parse job payload from job {}", job.getId(), ex);
       }
     }
   }
