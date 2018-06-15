@@ -1286,6 +1286,7 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
 
         MediaPackageElementBuilder builder = MediaPackageElementBuilderFactory.newInstance().newElementBuilder();
         Attachment convertedImage = (Attachment) builder.elementFromURI(workspaceURI, Attachment.TYPE, null);
+        convertedImage.setIdentifier(idBuilder.createNew().toString());
         convertedImages.add(convertedImage);
       }
     } catch (Throwable t) {

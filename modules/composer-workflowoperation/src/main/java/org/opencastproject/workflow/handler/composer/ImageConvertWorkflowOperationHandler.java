@@ -177,14 +177,15 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
     Map<Job, Attachment> jobs = new Hashtable<>();
     try {
       for (Attachment sourceElement : sourceElements) {
-        Job job = composerService.convertImage(sourceElement, (String[]) profiles.toArray());
+        Job job = composerService.convertImage(sourceElement, profiles.toArray(new String[profiles.size()]));
         jobs.put(job, sourceElement);
       }
-      if (!waitForStatus((Job[]) jobs.keySet().toArray()).isSuccess()) {
+      if (!waitForStatus(jobs.keySet().toArray(new Job[jobs.size()])).isSuccess()) {
         throw new WorkflowOperationException("At least one image conversation job does not succeeded.");
       }
-      for (Job job : jobs.keySet()) {
-        Attachment sourceElement = jobs.get(job);
+      for (Map.Entry<Job, Attachment> jobEntry : jobs.entrySet()) {
+        Job job = jobEntry.getKey();
+        Attachment sourceElement = jobEntry.getValue();
         List<Attachment> targetElements =
                 (List<Attachment>) MediaPackageElementParser.getArrayFromXml(job.getPayload());
         for (Attachment targetElement : targetElements) {
@@ -239,7 +240,7 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
           for (String removingTag : removingTags) {
             targetElement.removeTag(removingTag);
           }
-          mediaPackage.addDerived(targetElement, jobs.get(job));
+          mediaPackage.addDerived(targetElement, sourceElement);
         }
       }
       return createResult(mediaPackage, WorkflowOperationResult.Action.CONTINUE);
