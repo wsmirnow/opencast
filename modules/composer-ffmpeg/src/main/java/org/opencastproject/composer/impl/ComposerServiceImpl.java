@@ -1197,18 +1197,25 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
    *      java.lang.String)
    */
   @Override
-  public Job convertImage(Attachment image, String profileId) throws EncoderException, MediaPackageException {
+  public Job convertImage(Attachment image, String... profileIds) throws EncoderException, MediaPackageException {
     if (image == null)
       throw new IllegalArgumentException("Source image cannot be null");
 
+    if (profileIds == null)
+      throw new IllegalArgumentException("At least one encoding profile must be set");
+
     String[] parameters = new String[2];
-    parameters[0] = profileId;
+    parameters[0] = StringUtils.join(profileIds, ',');
     parameters[1] = MediaPackageElementParser.getAsXml(image);
 
     try {
-      final EncodingProfile profile = profileScanner.getProfile(profileId);
+      float jobLoad = 0;
+      for (String profileId : profileIds) {
+        final EncodingProfile profile = profileScanner.getProfile(profileId);
+        jobLoad = Math.max(jobLoad, profile.getJobLoad());
+      }
       return serviceRegistry.createJob(JOB_TYPE, Operation.ImageConversion.toString(), Arrays.asList(parameters),
-              profile.getJobLoad());
+             jobLoad);
     } catch (ServiceRegistryException e) {
       throw new EncoderException("Unable to create a job", e);
     }
@@ -1222,61 +1229,79 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
    * @param sourceImage
    *          the source image
    * @param profileId
-   *          the identifer of the encoding profile to use
-   * @return the image as an attachment or none if the operation does not return an image. This may happen for example
-   *         when doing two pass encodings where the first pass only creates metadata for the second one
+   *          the identifer of the encoding profiles to use
+   * @return the list of converted images as an attachment.
    * @throws EncoderException
    *           if converting the image fails
    */
-  private Option<Attachment> convertImage(Job job, Attachment sourceImage, String profileId) throws EncoderException,
+  private List<Attachment> convertImage(Job job, Attachment sourceImage, String... profileIds) throws EncoderException,
           MediaPackageException {
-    logger.info("Converting {}", sourceImage);
-
-    // Get the encoding profile
-    final EncodingProfile profile = getProfile(job, profileId);
-
-    // Create the encoding engine
-    final EncoderEngine encoderEngine = getEncoderEngine();
-
-    // Finally get the file that needs to be encoded
-    File imageFile;
+    List<Attachment> convertedImages = new ArrayList<>();
     try {
-      imageFile = workspace.get(sourceImage.getURI());
-    } catch (NotFoundException e) {
-      incident().recordFailure(job, WORKSPACE_GET_NOT_FOUND, e,
-              getWorkspaceMediapackageParams("source image", sourceImage), NO_DETAILS);
-      throw new EncoderException("Requested video track " + sourceImage + " was not found", e);
-    } catch (IOException e) {
-      incident().recordFailure(job, WORKSPACE_GET_IO_EXCEPTION, e,
-              getWorkspaceMediapackageParams("source image", sourceImage), NO_DETAILS);
-      throw new EncoderException("Error accessing video track " + sourceImage, e);
+      for (String profileId : profileIds) {
+        logger.info("Converting {} using encoding profile {}", sourceImage, profileId);
+
+        // Get the encoding profile
+        final EncodingProfile profile = getProfile(job, profileId);
+
+        // Create the encoding engine
+        final EncoderEngine encoderEngine = getEncoderEngine();
+
+        // Finally get the file that needs to be encoded
+        File imageFile;
+        try {
+          imageFile = workspace.get(sourceImage.getURI());
+        } catch (NotFoundException e) {
+          incident().recordFailure(job, WORKSPACE_GET_NOT_FOUND, e,
+                  getWorkspaceMediapackageParams("source image", sourceImage), NO_DETAILS);
+          throw new EncoderException("Requested video track " + sourceImage + " was not found", e);
+        } catch (IOException e) {
+          incident().recordFailure(job, WORKSPACE_GET_IO_EXCEPTION, e,
+                  getWorkspaceMediapackageParams("source image", sourceImage), NO_DETAILS);
+          throw new EncoderException("Error accessing video track " + sourceImage, e);
+        }
+
+        // Do the work
+        File output;
+        try {
+          output = encoderEngine.encode(imageFile, profile, null);
+        } catch (EncoderException e) {
+          Map<String, String> params = new HashMap<>();
+          params.put("image", sourceImage.getURI().toString());
+          params.put("profile", profile.getIdentifier());
+          incident().recordFailure(job, CONVERT_IMAGE_FAILED, e, params, detailsFor(e, encoderEngine));
+          throw e;
+        } finally {
+          activeEncoder.remove(encoderEngine);
+        }
+
+        // encoding did not return a file
+        if (!output.exists() || output.length() == 0)
+          throw new EncoderException(format(
+              "Image conversion job %d doesn't created an output file for the source image %s with encoding profile %s",
+              job.getId(), sourceImage.getURI().toString(), profileId));
+
+        // Put the file in the workspace
+        URI workspaceURI = putToCollection(job, output, "converted image file");
+
+        MediaPackageElementBuilder builder = MediaPackageElementBuilderFactory.newInstance().newElementBuilder();
+        Attachment convertedImage = (Attachment) builder.elementFromURI(workspaceURI, Attachment.TYPE, null);
+        convertedImage.setIdentifier(idBuilder.createNew().toString());
+        convertedImages.add(convertedImage);
+      }
+    } catch (Throwable t) {
+      for (Attachment convertedImage : convertedImages) {
+        try {
+          workspace.delete(convertedImage.getURI());
+        } catch (NotFoundException ex) {
+          // do nothing here
+        } catch (IOException ex) {
+          logger.warn("Unable to delete converted image {} from workspace", convertedImage.getURI(), ex);
+        }
+      }
+      throw t;
     }
-
-    // Do the work
-    File output;
-    try {
-      output = encoderEngine.encode(imageFile, profile, null);
-    } catch (EncoderException e) {
-      Map<String, String> params = new HashMap<>();
-      params.put("image", sourceImage.getURI().toString());
-      params.put("profile", profile.getIdentifier());
-      incident().recordFailure(job, CONVERT_IMAGE_FAILED, e, params, detailsFor(e, encoderEngine));
-      throw e;
-    } finally {
-      activeEncoder.remove(encoderEngine);
-    }
-
-    // encoding did not return a file
-    if (!output.exists() || output.length() == 0)
-      return none();
-
-    // Put the file in the workspace
-    URI workspaceURI = putToCollection(job, output, "converted image file");
-
-    MediaPackageElementBuilder builder = MediaPackageElementBuilderFactory.newInstance().newElementBuilder();
-    Attachment attachment = (Attachment) builder.elementFromURI(workspaceURI, Attachment.TYPE, null);
-
-    return some(attachment);
+    return convertedImages;
   }
 
   /**
@@ -1321,9 +1346,10 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
           serialized = MediaPackageElementParser.getArrayAsXml(resultingElements);
           break;
         case ImageConversion:
+          String[] encodingProfilesArr = StringUtils.split(arguments.get(0), ',');
           Attachment sourceImage = (Attachment) MediaPackageElementParser.getFromXml(arguments.get(1));
-          serialized = convertImage(job, sourceImage, encodingProfile).map(
-                  MediaPackageElementParser.getAsXml()).getOrElse("");
+          List<Attachment> convertedImages = convertImage(job, sourceImage, encodingProfilesArr);
+          serialized = MediaPackageElementParser.getArrayAsXml(convertedImages);
           break;
         case Mux:
           firstTrack = (Track) MediaPackageElementParser.getFromXml(arguments.get(1));
