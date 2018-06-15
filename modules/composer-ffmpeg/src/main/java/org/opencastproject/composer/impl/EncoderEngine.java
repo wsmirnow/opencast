@@ -50,6 +50,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -788,7 +789,7 @@ public class EncoderEngine implements AutoCloseable {
           Boolean hasAudio) throws Exception {
     double vfade = transitionDuration / 1000; // video and audio have the same transition duration
     double afade = vfade;
-    DecimalFormat f = new DecimalFormat("0.00");
+    DecimalFormat f = new DecimalFormat("0.00", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
     List<String> vpads = new ArrayList<>();
     List<String> apads = new ArrayList<>();
     List<String> clauses = new ArrayList<>(); // The clauses are ordered
