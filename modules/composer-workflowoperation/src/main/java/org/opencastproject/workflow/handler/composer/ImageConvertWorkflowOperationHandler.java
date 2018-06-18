@@ -41,6 +41,7 @@ import org.opencastproject.workflow.api.WorkflowOperationResult;
 import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,8 +126,9 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
     String encodingProfileOption = StringUtils.trimToNull(operation.getConfiguration("encoding-profile"));
     if (encodingProfileOption == null)
       encodingProfileOption = StringUtils.trimToNull(operation.getConfiguration("encoding-profiles"));
-    boolean tagsAndFlavorsOption = Boolean
-            .parseBoolean(StringUtils.trimToNull(operation.getConfiguration("tags-and-flavors")));
+    String tagsAndFlavorsOption = StringUtils.trimToNull(operation.getConfiguration("tags-and-flavors"));
+    boolean tagsAndFlavors = BooleanUtils.toBoolean(tagsAndFlavorsOption);
+
 
     MediaPackage mediaPackage = workflowInstance.getMediaPackage();
 
@@ -172,7 +174,7 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
     }
 
     // Look for elements matching the tag
-    Collection<Attachment> sourceElements = attachmentSelector.select(mediaPackage, tagsAndFlavorsOption);
+    Collection<Attachment> sourceElements = attachmentSelector.select(mediaPackage, tagsAndFlavors);
 
     Map<Job, Attachment> jobs = new Hashtable<>();
     try {
