@@ -12,12 +12,12 @@ Source tags and flavors can be used in combination.
 
 |configuration keys|example|description|default value|
 |------------------|-------|-----------|-------------|
-|**source-tags***|preview+player,preview+search|Comma separated list of tags of attachments to be selected as input.|EMPTY|
-|**source-flavors***|*/image|Comma separated list of flavors of attachments to be selected as input.|EMPTY|
-|tags-and-flavors|false|Wether to select elements with the given tags and flavors (set this value to `true`) or select elements with tags or flavors (set this value to `false`)|false|
+|**source-tags***|preview+player,preview+search|A comma separated lsit of source image(s) tags.|EMPTY|
+|**source-flavors***|*/image|A comma separated list of source image(s) flavors.|EMPTY|
+|tags-and-flavors|false|An boolean value wether so select elements with tags and flavors (then set this option to true) or either tags or flavors (then set this option to false).|false|
 |target-tags|+preview-converted,-preview+player|Apply these (comma separated) tags to the output attachments. If a target-tag starts with a '-', it will be removed from preexisting tags, if a target-tag starts with a '+', it will be added to preexisting tags. If there is no prefix, all preexisting tags are removed and replaced by the target-tags.|EMPTY|
 |**target-flavor***|*/image+converted|Apply these flavor to the output attachments.|EMPTY|
-|**encoding-profile***|jpeg-player,jpeg-search|A comma separated list of encoding profiles to be applied to each input attachment.|EMPTY|
+|**encoding-profiles***|jpeg-player,jpeg-search|A comma separated list of encoding profiles to be applied to each input image.|EMPTY|
 
 The options marked with * are requeried.
 
@@ -34,7 +34,7 @@ The options marked with * are requeried.
         <configuration key="tags-and-flavors">true</configuration>
         <configuration key="target-tags"></configuration>
         <configuration key="target-flavor">*/preview+player</configuration>
-        <configuration key="encoding-profile">preview-regular.image,preview-small.image</configuration>
+        <configuration key="encoding-profiles">preview-regular.image,preview-small.image</configuration>
       </configurations>
     </operation>
 
