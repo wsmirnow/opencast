@@ -72,7 +72,6 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
             + "Default value is false.");
     CONFIG_OPTIONS.put("target-flavor", "The flavor to apply to the converted image(s).");
     CONFIG_OPTIONS.put("target-tags", "The tags to apply to the converted image(s).");
-//    CONFIG_OPTIONS.put("target-filename-pattern", "The pattern to apply to file name of the converted images");
     CONFIG_OPTIONS.put("encoding-profiles", "The encoding profile(s) to use, separated by ','.");
   }
 
@@ -122,7 +121,6 @@ public class ImageConvertWorkflowOperationHandler extends AbstractWorkflowOperat
     if (targetFlavorOption == null)
       targetFlavorOption = StringUtils.trimToNull(operation.getConfiguration("target-flavors"));
     String targetTagsOption = StringUtils.trimToNull(operation.getConfiguration("target-tags"));
-//    String targetFileNamePatternOption = StringUtils.trimToNull(operation.getConfiguration("target-filename-pattern"));
     String encodingProfileOption = StringUtils.trimToNull(operation.getConfiguration("encoding-profile"));
     if (encodingProfileOption == null)
       encodingProfileOption = StringUtils.trimToNull(operation.getConfiguration("encoding-profiles"));
