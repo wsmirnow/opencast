@@ -68,7 +68,6 @@ import org.opencastproject.smil.entity.media.param.api.SmilMediaParamGroup;
 import org.opencastproject.util.FileSupport;
 import org.opencastproject.util.JsonObj;
 import org.opencastproject.util.LoadUtil;
-import org.opencastproject.util.MimeTypes;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.data.Collections;
 import org.opencastproject.util.data.Option;
@@ -144,6 +143,7 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
   private static final int IMAGE_EXTRACTION_TIME_OUTSIDE_DURATION = 17;
   private static final int IMAGE_EXTRACTION_NO_VIDEO = 18;
   private static final int PROCESS_SMIL_FAILED = 19;
+  private static final int MULTI_ENCODE_FAILED = 20;
   private static final int NO_STREAMS = 23;
 
   /** The logging instance */
@@ -174,19 +174,21 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
   public static final float DEFAULT_JOB_LOAD_MAX_MULTIPLE_PROFILES = 0.8f;
   /** The default factor used to multiply the sum of encoding profiles load job for ProcessSmil */
   public static final float DEFAULT_PROCESS_SMIL_JOB_LOAD_FACTOR = 0.5f;
+  public static final float DEFAULT_MULTI_ENCODE_JOB_LOAD_FACTOR = 0.5f;
 
   public static final String JOB_LOAD_MAX_MULTIPLE_PROFILES = "job.load.max.multiple.profiles";
   public static final String JOB_LOAD_FACTOR_PROCESS_SMIL = "job.load.factor.process.smil";
 
   private float maxMultipleProfilesJobLoad = DEFAULT_JOB_LOAD_MAX_MULTIPLE_PROFILES;
   private float processSmilJobLoadFactor = DEFAULT_PROCESS_SMIL_JOB_LOAD_FACTOR;
+  private float multiEncodeJobLoadFactor = DEFAULT_MULTI_ENCODE_JOB_LOAD_FACTOR;
 
   /** default transition */
   private int transitionDuration = (int) (DEFAULT_PROCESS_SMIL_CLIP_TRANSITION_DURATION * 1000);
 
   /** List of available operations on jobs */
   enum Operation {
-    Encode, Image, ImageConversion, Mux, Trim, Composite, Concat, ImageToVideo, ParallelEncode, Demux, ProcessSmil
+    Encode, Image, ImageConversion, Mux, Trim, Composite, Concat, ImageToVideo, ParallelEncode, Demux, ProcessSmil, MultiEncode
   }
 
   /** tracked encoder engines */
@@ -390,9 +392,6 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
     // Have the encoded track inspected and return the result
     Track inspectedTrack = inspect(job, workspaceURI);
     inspectedTrack.setIdentifier(targetTrackId);
-
-    if (profile.getMimeType() != null)
-      inspectedTrack.setMimeType(MimeTypes.parseMimeType(profile.getMimeType()));
 
     return some(inspectedTrack);
   }
@@ -745,9 +744,6 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
       Track inspectedTrack = inspect(job, workspaceURI);
       inspectedTrack.setIdentifier(targetTrackId);
 
-      if (profile.getMimeType() != null)
-        inspectedTrack.setMimeType(MimeTypes.parseMimeType(profile.getMimeType()));
-
       return some(inspectedTrack);
     } catch (Exception e) {
       if (upperLaidOutElement.isSome()) {
@@ -902,9 +898,6 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
     Track inspectedTrack = inspect(job, workspaceURI);
     inspectedTrack.setIdentifier(targetTrackId);
 
-    if (profile.getMimeType() != null)
-      inspectedTrack.setMimeType(MimeTypes.parseMimeType(profile.getMimeType()));
-
     return some(inspectedTrack);
   }
 
@@ -981,9 +974,6 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
     Track inspectedTrack = inspect(job, workspaceURI);
     inspectedTrack.setIdentifier(targetTrackId);
 
-    if (profile.getMimeType() != null)
-      inspectedTrack.setMimeType(MimeTypes.parseMimeType(profile.getMimeType()));
-
     return some(inspectedTrack);
   }
 
@@ -1013,6 +1003,27 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
       return serviceRegistry.createJob(JOB_TYPE, Operation.Image.toString(), parameters, profile.getJobLoad());
     } catch (ServiceRegistryException e) {
       throw new EncoderException("Unable to create a job", e);
+    }
+  }
+
+  @Override
+  public List<Attachment> imageSync(Track sourceTrack, String profileId, double... time) throws EncoderException,
+      MediaPackageException {
+    Job job = null;
+    try {
+      final EncodingProfile profile = profileScanner.getProfile(profileId);
+      job = serviceRegistry
+          .createJob(
+              JOB_TYPE, Operation.Image.toString(), null, null, false, profile.getJobLoad());
+      job.setStatus(Job.Status.RUNNING);
+      job = serviceRegistry.updateJob(job);
+      final List<Attachment> images = image(job, sourceTrack, profileId, time);
+      job.setStatus(Job.Status.FINISHED);
+      return images;
+    } catch (ServiceRegistryException | NotFoundException e) {
+      throw new EncoderException("Unable to create a job", e);
+    } finally {
+      finallyUpdateJob(job);
     }
   }
 
@@ -1221,6 +1232,26 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
     }
   }
 
+  @Override
+  public Attachment convertImageSync(Attachment image, String profileId) throws EncoderException, MediaPackageException {
+    Job job = null;
+    try {
+      final EncodingProfile profile = profileScanner.getProfile(profileId);
+      job = serviceRegistry
+          .createJob(
+              JOB_TYPE, Operation.Image.toString(), null, null, false, profile.getJobLoad());
+      job.setStatus(Job.Status.RUNNING);
+      job = serviceRegistry.updateJob(job);
+      Option<Attachment> result = convertImage(job, image, profileId);
+      job.setStatus(Job.Status.FINISHED);
+      return result.getOrElseNull();
+    } catch (ServiceRegistryException | NotFoundException e) {
+      throw new EncoderException("Unable to create a job", e);
+    } finally {
+      finallyUpdateJob(job);
+    }
+  }
+
   /**
    * Converts an image from <code>sourceImage</code> to a new format.
    *
@@ -1423,6 +1454,12 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
           String mediaType = arguments.get(2); // v=video,a=audio,otherwise both
           List<String> encodingProfiles = arguments.subList(3, arguments.size());
           outTracks = processSmil(job, smil, trackParamGroupId, mediaType, encodingProfiles);
+          serialized = StringUtils.trimToEmpty(MediaPackageElementParser.getArrayAsXml(outTracks));
+          break;
+        case MultiEncode:
+          firstTrack = (Track) MediaPackageElementParser.getFromXml(arguments.get(0));
+          List<String> encodingProfiles2 = arguments.subList(1, arguments.size());
+          outTracks = multiEncode(job, firstTrack, encodingProfiles2);
           serialized = StringUtils.trimToEmpty(MediaPackageElementParser.getArrayAsXml(outTracks));
           break;
         default:
@@ -1677,7 +1714,7 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
       if (hasAudio) {
         for (int i = 0; i < files.size(); i++) {
           if (!tracks.get(i).hasAudio())
-            sb.append("aevalsrc=0::d=1[silent").append(i + 1).append("];");
+            sb.append("aevalsrc=0:d=1[silent").append(i + 1).append("];");
         }
       }
     }
@@ -2201,13 +2238,86 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
       } finally {
         activeEncoder.remove(encoderEngine);
       }
-      logger.info("ProcessSmil/MultiTrimConcat returns " + outputs.size() + " media files ", outputs);
+      logger.info("ProcessSmil/MultiTrimConcat returns {} media files {}", outputs.size(), outputs);
       List<URI> workspaceURIs = putToCollection(job, outputs, "processSmil files");
       List<Track> tracks = inspect(job, workspaceURIs);
       tracks.forEach(track -> track.setIdentifier(idBuilder.createNew().toString()));
       return tracks;
     } catch (Exception e) { // clean up all the stored files
       throw new EncoderException("ProcessSmil operation failed to run ", e);
+    }
+  }
+
+  @Override
+  public Job multiEncode(Track sourceTrack, List<String> profileIds) throws EncoderException, MediaPackageException {
+    try {
+      // Job Load is based on number of encoding profiles
+      float load = calculateJobLoadForMultipleProfiles(profileIds, multiEncodeJobLoadFactor);
+      ArrayList<String> args = new ArrayList<>();
+      args.add(MediaPackageElementParser.getAsXml(sourceTrack));
+      args.addAll(profileIds);
+      return serviceRegistry.createJob(JOB_TYPE, Operation.MultiEncode.toString(), args, load);
+    } catch (ServiceRegistryException e) {
+      throw new EncoderException("Unable to create a job", e);
+    }
+  }
+
+  /**
+   * A single encoding process that produces multiple outputs from a single track(s) using a list of encoding profiles.
+   * Each output can be tagged by the profile name.
+   *
+   * @param job
+   *          - encoding job
+   * @param track
+   *          - source track
+   * @param profileIds
+   *          - list of encoding profile Ids
+   * @return encoded files
+   * @throws EncoderException
+   *           - if can't encode
+   * @throws IllegalArgumentException
+   *           - if missing arguments
+   *
+   */
+  protected List<Track> multiEncode(final Job job, Track track, List<String> profileIds)
+          throws EncoderException, IllegalArgumentException {
+    if (job == null)
+      throw new IllegalArgumentException("The Job parameter must not be null");
+    if (track == null)
+      throw new IllegalArgumentException("Source track cannot be null");
+    if (profileIds == null || profileIds.isEmpty())
+      throw new IllegalArgumentException("Cannot encode without encoding profiles");
+    List<File> outputs = null;
+    try {
+      final File videoFile = loadTrackIntoWorkspace(job, "source", track);
+      // Get the encoding profiles
+      List<EncodingProfile> profiles = new ArrayList<>();
+      for (String profileId : profileIds) {
+        EncodingProfile profile = getProfile(job, profileId);
+        profiles.add(profile);
+      }
+      logger.info("Encoding source track {} using profiles '{}'", track.getIdentifier(), profileIds);
+      // Do the work
+      EncoderEngine encoderEngine = getEncoderEngine();
+      try {
+        outputs = encoderEngine.multiTrimConcat(Arrays.asList(videoFile), null, profiles, 0, track.hasVideo(),
+                track.hasAudio());
+      } catch (EncoderException e) {
+        Map<String, String> params = new HashMap<>();
+        params.put("videos", videoFile.getName());
+        params.put("profiles", StringUtils.join(profileIds, ","));
+        incident().recordFailure(job, MULTI_ENCODE_FAILED, e, params, detailsFor(e, encoderEngine));
+        throw e;
+      } finally {
+        activeEncoder.remove(encoderEngine);
+      }
+      logger.info("MultiEncode returns {} media files {} ", outputs.size(), outputs);
+      List<URI> workspaceURIs = putToCollection(job, outputs, "multiencode files");
+      List<Track> tracks = inspect(job, workspaceURIs);
+      tracks.forEach(eachtrack -> eachtrack.setIdentifier(idBuilder.createNew().toString()));
+      return tracks;
+    } catch (Exception e) {
+      throw new EncoderException("MultiEncode operation failed to run ", e);
     }
   }
 

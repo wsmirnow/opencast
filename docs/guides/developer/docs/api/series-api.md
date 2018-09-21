@@ -19,16 +19,21 @@ The following filters are available:
 
 Filter Name    | Description
 :--------------|:-----------
-`contributors` | Series where the contributors specified in the metadata field match
-`creator`      | Series where the creator specified in the metadata field match
+`contributors` | Series where the contributors specified in the metadata field match. Can occur multiple times
+`Creator`      | Series where the creator specified in the metadata field match (please use `creator` for version 1.1.0 and higher instead)
 `creationDate` | Series that were created between two dates. The two dates are in UTC format to the second i.e. yyyy-MM-ddTHH:mm:ssZ e.g. 2014-09-27T16:25Z. They are seperated by a forward slash (url encoded or not) so an example of the full filter would be CreationDate:2015-05-08T00:00:00.000Z/2015-05-10T00:00:00.000Z
 `language`     | Series based upon the language specified
 `license`      | Series based upon the license specified
-`organizers`   | Series where the organizers specified in the metadata field match
+`organizers`   | Series where the organizers specified in the metadata field match. Can occur multiple times
 `managedAcl`   | Series who have the same managed acl name
-`subject`      | By the subject they are a part of
+`subject`      | By the subject they are a part of. Can occur multiple times
 `textFilter`   | Filters series where any part of the series' metadata fields match this value
 `title`        | By the title of the series
+`identifier`   | By the technical identifiers of the series. Can occur multiple times (version 1.1.0 and higher)
+`desription`   | By the description of the series (version 1.1.0 and higher)
+`creator`      | Series where the creator specified in the metadata field match (version 1.1.0 and higher)
+`publishers`   | Series where the publishers specified in the metadata field match. Can occur multiple times (version 1.1.0 and higher)
+`rightsholder` | By the rights holder of the series (version 1.1.0 and higher)
 
 The list can be sorted by the following criteria:
 
@@ -48,16 +53,20 @@ __Response__
 
 `200 (OK)`: A (potentially empty) list of series is returned as JSON array contained JSON objects describing the series:
 
-Field           | Type                                 | Description
-:---------------|:-------------------------------------|:-----------
-`identifier`    | [`string`](types.md#basic)           | The unique identifier of the series
-`created`       | [`datetime`](types.md#date-and-time) | The data when the series was created
-`creator`       | [`string`](types.md#basic)           | The name of the user that has created the series
-`title`\*       | [`string`](types.md#basic)           | The title of the series
-`contributors`\*| [`array[string]`](types.md#array)    | The contributors of the series
-`publishers`\*  | [`array[string]`](types.md#array)    | The publishers of the series
-`subjects`\*    | [`array[string]`](types.md#array)    | The subjects of the series
-`organizers`\*  | [`array[string]`](types.md#array)    | The organizers of the series
+Field            | Type                                 | Description
+:----------------|:-------------------------------------|:-----------
+`identifier`     | [`string`](types.md#basic)           | The unique identifier of the series
+`created`\*      | [`datetime`](types.md#date-and-time) | The data when the series was created
+`creator`        | [`string`](types.md#basic)           | The name of the user that has created the series
+`title`\*        | [`string`](types.md#basic)           | The title of the series
+`contributors`\* | [`array[string]`](types.md#array)    | The contributors of the series
+`publishers`\*   | [`array[string]`](types.md#array)    | The publishers of the series
+`subjects`\*     | [`array[string]`](types.md#array)    | The subjects of the series
+`organizers`\*   | [`array[string]`](types.md#array)    | The organizers of the series
+`description`\*  | [`string`](types.md#basic)           | The description of the series (version 1.1.0 and higher)
+`language`\*     | [`string`](types.md#basic)           | The language of the series (version 1.1.0 and higher)
+`license`\*      | [`string`](types.md#basic)           | The license of the series (version 1.1.0 and higher)
+`rightsholder`\* | [`string`](types.md#basic)           | The rights holder of the series (version 1.1.0 and higher)
 
 \* Metadata fields from the default metadata catalog `dublincore/series`
 
@@ -117,18 +126,21 @@ __Response__
 
 `200 (OK)`: The series is returned as a JSON object containing the following fields:
 
-Field           | Type                                 | Description
-:---------------|:-------------------------------------|:-----------
-`identifier`    | [`string`](types.md#basic)           | The unique identifier of the series
-`created`       | [`datetime`](types.md#date-and-time) | The data when the series was created
-`creator`       | [`string`](types.md#basic)           | The name of the user that has created the series
-`title`\*       | [`string`](types.md#basic)           | The title of the series
-`contributors`\*| [`array[string]`](types.md#array)    | The contributors of the series
-`publishers`\*  | [`array[string]`](types.md#array)    | The publishers of the series
-`subjects`\*    | [`array[string]`](types.md#array)    | The subjects of the series
-`organizers`\*  | [`array[string]`](types.md#array)    | The organizers of the series
-`organization`\*| [`string`](types.md#basic)           | The identifier of the tenant this series belongs to
-`opt_out`       | [`string`](types.md#basic)           | Field is not used
+Field            | Type                                 | Description
+:----------------|:-------------------------------------|:-----------
+`identifier`     | [`string`](types.md#basic)           | The unique identifier of the series
+`created`\*      | [`datetime`](types.md#date-and-time) | The data when the series was created
+`creator`        | [`string`](types.md#basic)           | The name of the user that has created the series
+`title`\*        | [`string`](types.md#basic)           | The title of the series
+`contributors`\* | [`array[string]`](types.md#array)    | The contributors of the series
+`publishers`\*   | [`array[string]`](types.md#array)    | The publishers of the series
+`subjects`\*     | [`array[string]`](types.md#array)    | The subjects of the series
+`organizers`\*   | [`array[string]`](types.md#array)    | The organizers of the series
+`organization`\* | [`string`](types.md#basic)           | The identifier of the tenant this series belongs to
+`opt_out`        | [`string`](types.md#basic)           | Field is not used
+`language`\*     | [`string`](types.md#basic)           | The language of the series (version 1.1.0 and higher)
+`license`\*      | [`string`](types.md#basic)           | The license of the series (version 1.1.0 and higher)
+`rightsholder`\* | [`string`](types.md#basic)           | The rights holder of the series (version 1.1.0 and higher)
 
 \* Fields from the default metadata catalog `dublincore/series`
 

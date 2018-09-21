@@ -7,9 +7,22 @@
     <tag>archive</tag>
   </tags>
   <description/>
+  <displayOrder>5</displayOrder>
   <configuration_panel/>
 
   <operations>
+
+
+      <!-- Apply the default workflow configuration -->
+
+      <operation
+        id="defaults"
+        description="Applying default configuration values">
+        <configurations>
+          <configuration key="thumbnailType">0</configuration>
+          <configuration key="thumbnailPosition">1</configuration>
+        </configurations>
+      </operation>
 
       <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
       <!-- Prepare asset                                                     -->

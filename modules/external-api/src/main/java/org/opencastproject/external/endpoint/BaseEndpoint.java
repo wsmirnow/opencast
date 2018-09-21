@@ -28,8 +28,10 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 import static org.opencastproject.userdirectory.UserIdRoleProvider.getUserIdRole;
 import static org.opencastproject.util.RestUtil.getEndpointUrl;
 
+import org.opencastproject.external.common.ApiMediaType;
 import org.opencastproject.external.common.ApiVersion;
 import org.opencastproject.external.impl.index.ExternalIndex;
+import org.opencastproject.rest.RestConstants;
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.Role;
 import org.opencastproject.security.api.SecurityService;
@@ -80,6 +82,7 @@ import javax.ws.rs.core.Response;
  * supported API.
  */
 @Path("/")
+@Produces({ ApiMediaType.JSON, ApiMediaType.VERSION_1_0_0, ApiMediaType.VERSION_1_1_0 })
 @RestService(name = "externalapiservice", title = "External API Service", notes = "", abstractText = "Provides a location for external apis to query the current server of the API.")
 public class BaseEndpoint {
 
@@ -93,7 +96,7 @@ public class BaseEndpoint {
   private static final SimpleSerializer serializer = new SimpleSerializer();
 
   /** Base URL of this endpoint */
-  private String endpointBaseUrl;
+  protected String endpointBaseUrl;
 
   /* OSGi service references */
   private SecurityService securityService;
@@ -113,13 +116,14 @@ public class BaseEndpoint {
   void activate(ComponentContext cc) {
     logger.info("Activating External API - Base Endpoint");
 
-    final Tuple<String, String> endpointUrl = getEndpointUrl(cc);
+    final Tuple<String, String> endpointUrl = getEndpointUrl(cc, OpencastConstants.EXTERNAL_API_URL_ORG_PROPERTY,
+            RestConstants.SERVICE_PATH_PROPERTY);
     endpointBaseUrl = UrlSupport.concat(endpointUrl.getA(), endpointUrl.getB());
+    logger.debug("Configured service endpoint is {}", endpointBaseUrl);
   }
 
   @GET
   @Path("")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getendpointinfo", description = "Returns key characteristics of the API such as the server name and the default version.", returnDescription = "", reponses = {
           @RestResponse(description = "The api information is returned.", responseCode = HttpServletResponse.SC_OK) })
   public Response getEndpointInfo() {
@@ -139,7 +143,6 @@ public class BaseEndpoint {
 
   @GET
   @Path("info/me")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getuserinfo", description = "Returns information on the logged in user.", returnDescription = "", reponses = {
           @RestResponse(description = "The user information is returned.", responseCode = HttpServletResponse.SC_OK) })
   public Response getUserInfo() {
@@ -153,7 +156,6 @@ public class BaseEndpoint {
 
   @GET
   @Path("info/me/roles")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getuserroles", description = "Returns current user's roles.", returnDescription = "", reponses = {
           @RestResponse(description = "The set of roles is returned.", responseCode = HttpServletResponse.SC_OK) })
   public Response getUserRoles() {
@@ -169,7 +171,6 @@ public class BaseEndpoint {
 
   @GET
   @Path("info/organization")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getorganizationinfo", description = "Returns the current organization.", returnDescription = "", reponses = {
           @RestResponse(description = "The organization details are returned.", responseCode = HttpServletResponse.SC_OK) })
   public Response getOrganizationInfo() {
@@ -183,7 +184,6 @@ public class BaseEndpoint {
 
   @GET
   @Path("info/organization/properties")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getorganizationproperties", description = "Returns the current organization's properties.", returnDescription = "", reponses = {
           @RestResponse(description = "The organization properties are returned.", responseCode = HttpServletResponse.SC_OK) })
   public Response getOrganizationProperties() {
@@ -199,19 +199,18 @@ public class BaseEndpoint {
 
   @GET
   @Path("version")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getversion", description = "Returns a list of available version as well as the default version.", returnDescription = "", reponses = {
           @RestResponse(description = "The default version is returned.", responseCode = HttpServletResponse.SC_OK) })
   public Response getVersion() throws Exception {
     List<JValue> versions = new ArrayList<>();
     versions.add(v(ApiVersion.VERSION_1_0_0.toString()));
+    versions.add(v(ApiVersion.VERSION_1_1_0.toString()));
     JValue json = obj(f("versions", arr(versions)), f("default", v(ApiVersion.CURRENT_VERSION.toString())));
     return RestUtil.R.ok(MediaType.APPLICATION_JSON_TYPE, serializer.toJson(json));
   }
 
   @GET
   @Path("version/default")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getversiondefault", description = "Returns the default version.", returnDescription = "", reponses = {
           @RestResponse(description = "The default version is returned.", responseCode = HttpServletResponse.SC_OK) })
   public Response getVersionDefault() throws Exception {

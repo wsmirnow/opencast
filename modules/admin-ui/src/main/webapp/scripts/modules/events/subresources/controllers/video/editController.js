@@ -62,11 +62,11 @@ angular.module('adminNg.controllers')
 
                     var index = $scope.video.segments.indexOf(segment);
 
-                    if ($scope.video.segments[index - 1]) {
-                        $scope.video.segments[index - 1].end = segment.end;
-                        $scope.video.segments.splice(index, 1);
-                    } else if ($scope.video.segments[index + 1]) {
+                    if ($scope.video.segments[index + 1]) {
                         $scope.video.segments[index + 1].start = segment.start;
+                        $scope.video.segments.splice(index, 1);
+                    } else if ($scope.video.segments[index - 1]) {
+                        $scope.video.segments[index - 1].end = segment.end;
                         $scope.video.segments.splice(index, 1);
                     }
                 }
@@ -146,15 +146,15 @@ angular.module('adminNg.controllers')
         });
 
         $scope.$on('ACTIVE_TRANSACTION', function () {
-            if (!$scope.submitButton) {
-                $scope.submitButton = true;
+            if (!$scope.activeTransaction) {
+                $scope.activeTransaction = true;
                 notificationId = Notifications.add('warning', 'ACTIVE_TRANSACTION', NOTIFICATION_CONTEXT, -1);
             }
         });
 
         $scope.$on('NO_ACTIVE_TRANSACTION', function () {
-            if ($scope.submitButton) {
-                $scope.submitButton = false;
+            if ($scope.activeTransaction) {
+                $scope.activeTransaction = false;
                 if (notificationId) {
                     Notifications.remove(notificationId, NOTIFICATION_CONTEXT);
                     notificationId = 0;

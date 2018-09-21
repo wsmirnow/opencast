@@ -6,6 +6,7 @@
   <tags>
     <tag>archive</tag>
   </tags>
+  <displayOrder>1000</displayOrder>
   <description/>
   <configuration_panel>
     <![CDATA[
@@ -73,9 +74,9 @@
 
       <!-- Show or hide the hold and publication configuration panel -->
       <script type="text/javascript">
-        <!-- Remove the line below if you wish to publish to AWS S3 -->
+        // Remove the line below if you wish to publish to AWS S3
         $('#publishToAws').prop('disabled', true);
-        <!-- Remove the line above if you wish to publish to AWS S3 -->
+        // Remove the line above if you wish to publish to AWS S3
 
         awsWasDisabled = $('#publishToAws').prop('disabled');
         awsWasChecked = $('#publishToAws').prop('checked');
@@ -106,16 +107,6 @@
     <!-- Apply the default workflow configuration -->
 
     <operation
-      id="import-wf-properties"
-      fail-on-error="true"
-      exception-handler-workflow="ng-partial-error"
-      description="Import workflow settings to Java properties file">
-      <configurations>
-        <configuration key="source-flavor">processing/defaults</configuration>
-      </configurations>
-    </operation>
-
-    <operation
       id="defaults"
       description="Applying default configuration values">
       <configurations>
@@ -132,6 +123,8 @@
         <configuration key="publishToYouTube">false</configuration>
         <configuration key="publishToAws">false</configuration>
         <configuration key="uploadedSearchPreview">false</configuration>
+        <configuration key="thumbnailType">0</configuration>
+        <configuration key="thumbnailPosition">1</configuration>
       </configurations>
     </operation>
 

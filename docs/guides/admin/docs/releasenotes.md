@@ -4,7 +4,8 @@ Opencast 6: Release Notes
 New Features and Improvements
 -----------------------------
 
-- …
+- **Admin UI** - Deleting Series now warns if series contains events. You can configure if the user is allowed to
+  delete a series containing events in the series endpoint config file.
 
 
 Configuration changes
@@ -22,11 +23,14 @@ Release Schedule
 
 |Date                         |Phase
 |-----------------------------|------------------------------------------
-|~October 1st 2018            |Feature Freeze
-|~December 15th 2018          |Release of Opencast 6.0
+|Sep 25th 2018                |Feature Freeze
+|Oct 29th - Nov 4th 2018      |Translation week
+|Nov 5th - Nov 18th 2018      |Public QA phase
+|Dec 10th 2018                |Release of Opencast 6.0
 
 
 Release Managers
 ----------------
 
-- Still looking for candidates
+- Matthias Neugebauer (University of Münster)
+- Lars Kiesow (ELAN e.V.)

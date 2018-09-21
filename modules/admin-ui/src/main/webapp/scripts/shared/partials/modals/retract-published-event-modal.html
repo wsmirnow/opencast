@@ -22,11 +22,11 @@
                     <select chosen pre-select-from="processing.workflows"
                         data-width="'100%'"
                         ng-change="processing.changeWorkflow(); valid();"
-                        data-disable-search-threshold="8"
+                        data-disable-search-threshold="0"
                         not-empty-selection
                         ng-model="processing.ud.workflow"
                         ng-model-options="{ allowInvalid: true }"
-                        ng-options="w.title for w in processing.workflows"
+                        ng-options="w.title for w in processing.workflows | orderBy: 'displayOrder':true"
                         data-placeholder="{{ 'EVENTS.EVENTS.DETAILS.PUBLICATIONS.SELECT_WORKFLOW' | translate }}"
                         no-results-text="'{{ 'EVENTS.EVENTS.DETAILS.PUBLICATIONS.SELECT_WORKFLOW_EMPTY' | translate }}'"
                         >
