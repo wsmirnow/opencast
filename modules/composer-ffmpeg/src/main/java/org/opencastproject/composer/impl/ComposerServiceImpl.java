@@ -1205,7 +1205,7 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
    * {@inheritDoc}
    *
    * @see org.opencastproject.composer.api.ComposerService#convertImage(org.opencastproject.mediapackage.Attachment,
-   *      java.lang.String)
+   *      java.lang.String...)
    */
   @Override
   public Job convertImage(Attachment image, String... profileIds) throws EncoderException, MediaPackageException {
@@ -1242,9 +1242,13 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
               JOB_TYPE, Operation.Image.toString(), null, null, false, profile.getJobLoad());
       job.setStatus(Job.Status.RUNNING);
       job = serviceRegistry.updateJob(job);
-      Option<Attachment> result = convertImage(job, image, profileId);
+      List<Attachment> result = convertImage(job, image, profileId);
+      if (result.isEmpty()) {
+        job.setStatus(Job.Status.FAILED);
+        return null;
+      }
       job.setStatus(Job.Status.FINISHED);
-      return result.getOrElseNull();
+      return result.get(0);
     } catch (ServiceRegistryException | NotFoundException e) {
       throw new EncoderException("Unable to create a job", e);
     } finally {
@@ -1259,7 +1263,7 @@ public class ComposerServiceImpl extends AbstractJobProducer implements Composer
    *          the associated job
    * @param sourceImage
    *          the source image
-   * @param profileId
+   * @param profileIds
    *          the identifer of the encoding profiles to use
    * @return the list of converted images as an attachment.
    * @throws EncoderException
