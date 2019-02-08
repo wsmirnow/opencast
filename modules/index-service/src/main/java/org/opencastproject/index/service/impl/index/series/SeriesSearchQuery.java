@@ -79,6 +79,20 @@ public class SeriesSearchQuery extends AbstractSearchQuery {
   }
 
   /**
+   * Override the parent method to enforce the series UID and ORGANIZATION are the part of queried fields as they are mandatory.
+   * @param field field name to be appear in the result
+   * @return this search query
+   */
+  @Override
+  public AbstractSearchQuery withField(String field) {
+    if (getFields().length == 0) {
+      super.withField(SeriesIndexSchema.ORGANIZATION);
+      super.withField(SeriesIndexSchema.UID);
+    }
+    return super.withField(field);
+  }
+
+  /**
    * Selects series with the given identifier.
    * <p>
    * Note that this method may be called multiple times to support selection of multiple series.

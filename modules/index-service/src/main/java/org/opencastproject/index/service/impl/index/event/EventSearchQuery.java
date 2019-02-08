@@ -21,6 +21,7 @@
 
 package org.opencastproject.index.service.impl.index.event;
 
+import org.opencastproject.index.service.impl.index.series.SeriesIndexSchema;
 import org.opencastproject.matterhorn.search.impl.AbstractSearchQuery;
 import org.opencastproject.security.api.Permissions;
 import org.opencastproject.security.api.Permissions.Action;
@@ -106,6 +107,30 @@ public class EventSearchQuery extends AbstractSearchQuery {
     this.actions.add(Permissions.Action.READ.toString());
     if (!user.getOrganization().getId().equals(organization))
       throw new IllegalStateException("User's organization must match search organization");
+  }
+
+  /**
+   * Override the parent method to enforce the event UID and ORGANIZATION are the part of queried fields as they are mandatory.
+   * Some other field dependencies are also configured here.
+   *
+   * @param field field name to be appear in the result
+   * @return this search query
+   */
+  @Override
+  public AbstractSearchQuery withField(String field) {
+    if (getFields().length == 0) {
+      super.withField(EventIndexSchema.ORGANIZATION);
+      super.withField(EventIndexSchema.UID);
+    }
+
+    if (StringUtils.equals(EventIndexSchema.EVENT_STATUS, field)) {
+      super.withField(EventIndexSchema.BLACKLISTED);
+      super.withField(EventIndexSchema.OPTED_OUT);
+      super.withField(EventIndexSchema.SCHEDULING_STATUS);
+      super.withField(EventIndexSchema.RECORDING_STATUS);
+      super.withField(EventIndexSchema.WORKFLOW_STATE);
+    }
+    return super.withField(field);
   }
 
   /**

@@ -47,7 +47,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +83,130 @@ public final class SeriesIndexUtils {
     Map<String, SearchMetadata<?>> metadataMap = metadata.toMap();
     String seriesXml = (String) metadataMap.get(SeriesIndexSchema.OBJECT).getValue();
     return Series.valueOf(IOUtils.toInputStream(seriesXml, Charset.defaultCharset()), unmarshaller);
+  }
+
+  /**
+   * Creates a search result item based on the data returned from the search index.
+   *
+   * @param metadata
+   *          the search metadata
+   * @return the search result item
+   */
+  public static Series toSeries(SearchMetadataCollection metadata) {
+    String id = null;
+    String org = null;
+    String title = null;
+    String description = null;
+    String subject = null;
+    String lang = null;
+    String creator = null;
+    String license = null;
+    String managedAcl = null;
+    String created = null;
+    List<String> organizers = null;
+    List<String> contributors = null;
+    List<String> publishers = null;
+    String rights = null;
+    String accessPolicy = null;
+    Boolean optOut = null;
+    Long theme = null;
+
+    for (SearchMetadata<?> item : metadata.getMetadata()) {
+      switch (item.getName()) {
+        case SeriesIndexSchema.UID:
+          id = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.ORGANIZATION:
+          org = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.TITLE:
+          title = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.DESCRIPTION:
+          description = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.SUBJECT:
+          subject = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.LANGUAGE:
+          lang = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.CREATOR:
+          creator = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.LICENSE:
+          license = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.MANAGED_ACL:
+          managedAcl = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.CREATED_DATE_TIME:
+          created = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.ORGANIZERS:
+          organizers = new ArrayList<>();
+          for (Object value : item.getValues()) {
+            organizers.add((String) value);
+          }
+          break;
+        case SeriesIndexSchema.CONTRIBUTORS:
+          contributors = new ArrayList<>();
+          for (Object value : item.getValues()) {
+            contributors.add((String) value);
+          }
+          break;
+        case SeriesIndexSchema.PUBLISHERS:
+          publishers = new ArrayList<>();
+          for (Object value : item.getValues()) {
+            publishers.add((String) value);
+          }
+          break;
+        case SeriesIndexSchema.RIGHTS_HOLDER:
+          rights = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.ACCESS_POLICY:
+          accessPolicy = (String) item.getValue();
+          break;
+        case SeriesIndexSchema.OPT_OUT:
+          optOut = (Boolean) item.getValue();
+          break;
+        case SeriesIndexSchema.THEME:
+          theme = (Long) item.getValue();
+          break;
+        default:
+          break;
+      }
+    }
+
+    // TODO assert the series id and organization are set
+    // if ((StringUtils.isBlank(id) || StringUtils.isBlank(org))) {
+    //  throw new IllegalStateException();
+
+    Series series = new Series(id, org);
+    series.setTitle(title);
+    series.setDescription(description);
+    series.setSubject(subject);
+    series.setLanguage(lang);
+    series.setCreator(creator);
+    series.setLicense(license);
+    series.setManagedAcl(managedAcl);
+    if (created != null) {
+      try {
+        long createdUTC = DateTimeSupport.fromUTC(created);
+        Date createdDate = new Date(createdUTC);
+        series.setCreatedDateTime(createdDate);
+      } catch (ParseException e) {
+      }
+    }
+    series.setOrganizers(organizers);
+    series.setContributors(contributors);
+    series.setPublishers(publishers);
+    series.setRightsHolder(rights);
+    series.setAccessPolicy(accessPolicy);
+    if (optOut != null)
+      series.setOptOut(optOut);
+    series.setTheme(theme);
+    return series;
   }
 
   /**

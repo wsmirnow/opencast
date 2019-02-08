@@ -123,7 +123,8 @@ public class AbstractSearchQuery implements SearchQuery {
   public AbstractSearchQuery withField(String field) {
     if (fields == null)
       fields = new ArrayList<>();
-    fields.add(field);
+    if (!fields.contains(field))
+      fields.add(field);
     return this;
   }
 

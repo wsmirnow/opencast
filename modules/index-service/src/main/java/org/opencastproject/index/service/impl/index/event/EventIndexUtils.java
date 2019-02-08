@@ -40,6 +40,7 @@ import org.opencastproject.mediapackage.VideoStream;
 import org.opencastproject.metadata.dublincore.DCMIPeriod;
 import org.opencastproject.metadata.dublincore.DublinCore;
 import org.opencastproject.metadata.dublincore.EncodingSchemeUtils;
+import org.opencastproject.scheduler.api.SchedulerService;
 import org.opencastproject.security.api.AccessControlEntry;
 import org.opencastproject.security.api.AccessControlList;
 import org.opencastproject.security.api.AccessControlParser;
@@ -48,6 +49,7 @@ import org.opencastproject.security.api.Permissions.Action;
 import org.opencastproject.security.api.User;
 import org.opencastproject.util.DateTimeSupport;
 import org.opencastproject.util.NotFoundException;
+import org.opencastproject.workflow.api.WorkflowInstance;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -60,6 +62,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -99,6 +102,318 @@ public final class EventIndexUtils {
     Map<String, SearchMetadata<?>> metadataMap = metadata.toMap();
     String eventJson = (String) metadataMap.get(EventIndexSchema.OBJECT).getValue();
     return Event.valueOf(IOUtils.toInputStream(eventJson, Charset.defaultCharset()), unmarshaller);
+  }
+
+  /**
+   * Creates a search result item based on the data returned from the search index.
+   *
+   * @param metadata
+   *          the search metadata
+   * @return the search result item
+   */
+  public static Event toEvent(SearchMetadataCollection metadata) {
+    String id = null;
+    String org = null;
+    String accessPolicy = null;
+    Map<String, String> agentConfig = new Hashtable<>();
+    String agentId = null;
+    Long archiveVersion = 0L;
+    List<String> attachmentFlavors = new ArrayList<>();
+    Boolean blacklisted = false;
+    List<String> contributors = new ArrayList<>();
+    String created = null;
+    String creator = null;
+    String description = null;
+    Long duration = 0L;
+    Boolean hasComments = false;
+    Boolean hasOpenComments = false;
+    Boolean hasPreview = false;
+    String language = null;
+    String license = null;
+    String location = null;
+    String managedAcl = null;
+    List<String> metadataFlavors = new ArrayList<>();
+    List<String> metadataMimetypes = new ArrayList<>();
+    Boolean needsCutting = false;
+    Boolean optedOut = false;
+    List<String> presenters = new ArrayList<>();
+    List<Publication> publications = new ArrayList<>();
+    String publisher = null;
+    String recordingEndDate = null;
+    String recordingStartDate = null;
+    String recordingStatus = null;
+    String reviewDate = null;
+    SchedulerService.ReviewStatus reviewStatus = null;
+    String rights = null;
+    String schedulingStatus = null;
+    String seriesId = null;
+    String seriesName = null;
+    String subject = null;
+    String technicalEndTime = null;
+    List<String> technicalPresenters = new ArrayList<>();
+    String technicalStartTime = null;
+    String title = null;
+    List<String> trackFlavors = new ArrayList<>();
+    List<String> trackMimetypes = new ArrayList<>();
+    List<String> trackStreamResolutions = new ArrayList<>();
+    Long workflowId = 0L;
+    String workflowDefinitionId = null;
+    String workflowScheduledDate = null;
+    WorkflowInstance.WorkflowState workflowState = null;
+
+    for (SearchMetadata<?> item : metadata.getMetadata()) {
+      switch (item.getName()) {
+        case EventIndexSchema.UID:
+          id = (String) item.getValue();
+          break;
+        case EventIndexSchema.ORGANIZATION:
+          org = (String) item.getValue();
+          break;
+        case EventIndexSchema.ACCESS_POLICY:
+          org = (String) item.getValue();
+          break;
+        case EventIndexSchema.AGENT_CONFIGURATION:
+          // TODO
+          // agentConfig = (String) item.getValue();
+          break;
+        case EventIndexSchema.AGENT_ID:
+          agentId = (String) item.getValue();
+          break;
+        case EventIndexSchema.ARCHIVE_VERSION:
+          archiveVersion = (Long) item.getValue();
+          break;
+        case EventIndexSchema.ATTACHMENT_FLAVOR:
+          for (Object attachmentFlavor : item.getValues()) {
+            attachmentFlavors.add((String) attachmentFlavor);
+          }
+          break;
+        case EventIndexSchema.BLACKLISTED:
+          blacklisted = (Boolean) item.getValue();
+          break;
+        case EventIndexSchema.CONTRIBUTOR:
+          for (Object contributor : item.getValues()) {
+            contributors.add((String) contributor);
+          }
+          break;
+        case EventIndexSchema.CREATED:
+          created = (String) item.getValue();
+          break;
+        case EventIndexSchema.CREATOR:
+          creator = (String) item.getValue();
+          break;
+        case EventIndexSchema.DESCRIPTION:
+          description = (String) item.getValue();
+          break;
+        case EventIndexSchema.DURATION:
+          duration = (Long) item.getValue();
+          break;
+        case EventIndexSchema.END_DATE:
+          recordingEndDate = (String) item.getValue();
+          break;
+        case EventIndexSchema.EVENT_STATUS:
+          // this field will be calculated from some other metadata (@see Event#updateEventStatus())
+          break;
+        case EventIndexSchema.HAS_COMMENTS:
+          hasComments = (Boolean) item.getValue();
+          break;
+        case EventIndexSchema.HAS_OPEN_COMMENTS:
+          hasOpenComments = (Boolean) item.getValue();
+          break;
+        case EventIndexSchema.LANGUAGE:
+          language = (String) item.getValue();
+          break;
+        case EventIndexSchema.LICENSE:
+          license = (String) item.getValue();
+          break;
+        case EventIndexSchema.LOCATION:
+          location = (String) item.getValue();
+          break;
+        case EventIndexSchema.MANAGED_ACL:
+          managedAcl = (String) item.getValue();
+          break;
+        case EventIndexSchema.METADATA_FLAVOR:
+          for (Object metadataFlavor : item.getValues()) {
+            metadataFlavors.add((String) metadataFlavor);
+          }
+          break;
+        case EventIndexSchema.METADATA_MIMETYPE:
+          for (Object metadataMimetype : item.getValues()) {
+            metadataMimetypes.add((String) metadataMimetype);
+          }
+          break;
+        case EventIndexSchema.NEEDS_CUTTING:
+          needsCutting = (Boolean) item.getValue();
+          break;
+        case EventIndexSchema.OPTED_OUT:
+          optedOut = (Boolean) item.getValue();
+          break;
+        case EventIndexSchema.PRESENTER:
+          for (Object presenter : item.getValues()) {
+            presenters.add((String)  presenter);
+          }
+          break;
+        case EventIndexSchema.PUBLICATION:
+          // TODO: @see #generatePublicationDoc()
+//          for (Object publication: item.getValues()) {
+//            // TODO parse object
+//            publications.add(publication);
+//          }
+          break;
+        case EventIndexSchema.PUBLISHER:
+          publisher = (String) item.getValue();
+          break;
+        case EventIndexSchema.RECORDING_STATUS:
+          recordingStatus = (String) item.getValue();
+          break;
+        case EventIndexSchema.REVIEW_DATE:
+          reviewDate = (String) item.getValue();
+          break;
+        case EventIndexSchema.REVIEW_STATUS:
+          String reviewStatusStr = (String) item.getValue();
+          if (StringUtils.isNotBlank(reviewStatusStr))
+            try {
+              reviewStatus = SchedulerService.ReviewStatus.valueOf(reviewStatusStr);
+            } catch (IllegalArgumentException e) {
+              logger.warn("Unable to parse event review status", e);
+            }
+          break;
+        case EventIndexSchema.RIGHTS:
+          rights = (String) item.getValue();
+          break;
+        case EventIndexSchema.SCHEDULING_STATUS:
+          schedulingStatus = (String) item.getValue();
+          break;
+        case EventIndexSchema.SERIES_ID:
+          seriesId = (String) item.getValue();
+          break;
+        case EventIndexSchema.SERIES_NAME:
+          seriesName = (String) item.getValue();
+          break;
+        case EventIndexSchema.START_DATE:
+          recordingStartDate = (String) item.getValue();
+          break;
+        case EventIndexSchema.SUBJECT:
+          subject = (String) item.getValue();
+          break;
+        case EventIndexSchema.TECHNICAL_END:
+          technicalEndTime = (String) item.getValue();
+          break;
+        case EventIndexSchema.TECHNICAL_PRESENTERS:
+          for (Object technicalPresenter : item.getValues()) {
+            technicalPresenters.add((String) technicalPresenter);
+          }
+          break;
+        case EventIndexSchema.TECHNICAL_START:
+          technicalStartTime = (String) item.getValue();
+          break;
+        case EventIndexSchema.TITLE:
+          title = (String) item.getValue();
+          break;
+        case EventIndexSchema.TRACK_FLAVOR:
+          for(Object trackFlavor : item.getValues()) {
+            trackFlavors.add((String) trackFlavor);
+          }
+          break;
+        case EventIndexSchema.TRACK_MIMETYPE:
+          for (Object trackMimetype : item.getValues()) {
+            trackMimetypes.add((String) trackMimetype);
+          }
+          break;
+        case EventIndexSchema.TRACK_STREAM_RESOLUTION:
+          for (Object trackStreamResolution : item.getValues()) {
+            trackStreamResolutions.add((String) trackStreamResolution);
+          }
+          break;
+        case EventIndexSchema.WORKFLOW_DEFINITION_ID:
+          workflowDefinitionId = (String) item.getValue();
+          break;
+        case EventIndexSchema.WORKFLOW_ID:
+          workflowId = (Long) item.getValue();
+          break;
+        case EventIndexSchema.WORKFLOW_SCHEDULED_DATETIME:
+          workflowScheduledDate = (String) item.getValue();
+          break;
+        case EventIndexSchema.WORKFLOW_STATE:
+          for (Object workflowStateStr : item.getValues()) {
+            try {
+              workflowState = WorkflowInstance.WorkflowState.valueOf((String) workflowStateStr);
+            } catch (IllegalArgumentException e) {
+              logger.warn("Unable to parse event workflow state", e);
+            }
+          }
+          break;
+        default:
+          if (StringUtils.startsWith(EventIndexSchema.ACL_PERMISSION_PREFIX, item.getName())) {
+            // sample input:
+            //  "acl_permission_read": [
+            //    [
+            //      "ROLE_ADMIN",
+            //      "ROLE_USER"
+            //    ]
+            //  ],
+            //  "acl_permission_write": [
+            //    [
+            //      "ROLE_ADMIN",
+            //    ]
+            //  ],
+            String policy = StringUtils.replace(item.getName(), EventIndexSchema.ACL_PERMISSION_PREFIX, "", 1);
+//            for (Object roleStr : item.getValues()) {
+//              String role = (String) roleStr;
+//              // TODO
+//            }
+          }
+          break;
+      }
+    }
+
+    Event event = new Event(id, org);
+    event.setAccessPolicy(accessPolicy);
+    event.setAgentConfiguration(agentConfig);
+    event.setAgentId(agentId);
+    event.setArchiveVersion(archiveVersion);
+    event.setAttachmentFlavors(attachmentFlavors);
+    event.setBlacklisted(blacklisted);
+    event.setContributors(contributors);
+    event.setCreated(created);
+    event.setCreator(creator);
+    event.setDescription(description);
+    event.setDuration(duration);
+    event.setHasComments(hasComments);
+    event.setHasOpenComments(hasOpenComments);
+    event.setHasPreview(hasPreview);
+    event.setLanguage(language);
+    event.setLicense(license);
+    event.setLocation(location);
+    event.setManagedAcl(managedAcl);
+    event.setMetadataFlavors(metadataFlavors);
+    event.setMetadataMimetypes(metadataMimetypes);
+    event.setNeedsCutting(needsCutting);
+    event.setOptedOut(optedOut);
+    event.setPresenters(presenters);
+    event.setPublications(publications);
+    event.setPublisher(publisher);
+    event.setRecordingEndDate(recordingEndDate);
+    event.setRecordingStartDate(recordingStartDate);
+    event.setRecordingStatus(recordingStatus);
+    event.setReviewDate(reviewDate);
+    event.setReviewStatus(reviewStatus);
+    event.setRights(rights);
+    event.setSchedulingStatus(schedulingStatus);
+    event.setSeriesId(seriesId);
+    event.setSeriesName(seriesName);
+    event.setSubject(subject);
+    event.setTechnicalEndTime(technicalEndTime);
+    event.setTechnicalPresenters(technicalPresenters);
+    event.setTechnicalStartTime(technicalStartTime);
+    event.setTitle(title);
+    event.setTrackFlavors(trackFlavors);
+    event.setTrackMimetypes(trackMimetypes);
+    event.setTrackStreamResolutions(trackStreamResolutions);
+    event.setWorkflowDefinitionId(workflowDefinitionId);
+    event.setWorkflowId(workflowId);
+    event.setWorkflowScheduledDate(workflowScheduledDate);
+    event.setWorkflowState(workflowState);
+    return event;
   }
 
   /**
