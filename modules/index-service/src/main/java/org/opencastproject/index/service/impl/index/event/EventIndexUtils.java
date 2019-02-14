@@ -310,7 +310,7 @@ public final class EventIndexUtils {
           title = (String) item.getValue();
           break;
         case EventIndexSchema.TRACK_FLAVOR:
-          for(Object trackFlavor : item.getValues()) {
+          for (Object trackFlavor : item.getValues()) {
             trackFlavors.add((String) trackFlavor);
           }
           break;

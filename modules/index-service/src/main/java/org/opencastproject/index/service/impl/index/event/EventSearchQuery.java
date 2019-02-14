@@ -21,7 +21,6 @@
 
 package org.opencastproject.index.service.impl.index.event;
 
-import org.opencastproject.index.service.impl.index.series.SeriesIndexSchema;
 import org.opencastproject.matterhorn.search.impl.AbstractSearchQuery;
 import org.opencastproject.security.api.Permissions;
 import org.opencastproject.security.api.Permissions.Action;
