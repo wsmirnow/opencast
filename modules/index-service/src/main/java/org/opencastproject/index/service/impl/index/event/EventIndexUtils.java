@@ -21,7 +21,6 @@
 
 package org.opencastproject.index.service.impl.index.event;
 
-
 import org.opencastproject.index.service.impl.index.AbstractSearchIndex;
 import org.opencastproject.index.service.impl.index.series.Series;
 import org.opencastproject.index.service.impl.index.series.SeriesSearchQuery;
@@ -34,9 +33,11 @@ import org.opencastproject.mediapackage.Attachment;
 import org.opencastproject.mediapackage.Catalog;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.Publication;
+import org.opencastproject.mediapackage.PublicationImpl;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.mediapackage.TrackSupport;
 import org.opencastproject.mediapackage.VideoStream;
+import org.opencastproject.mediapackage.attachment.AttachmentImpl;
 import org.opencastproject.metadata.dublincore.DCMIPeriod;
 import org.opencastproject.metadata.dublincore.DublinCore;
 import org.opencastproject.metadata.dublincore.EncodingSchemeUtils;
@@ -48,6 +49,8 @@ import org.opencastproject.security.api.Permissions;
 import org.opencastproject.security.api.Permissions.Action;
 import org.opencastproject.security.api.User;
 import org.opencastproject.util.DateTimeSupport;
+import org.opencastproject.util.MimeType;
+import org.opencastproject.util.MimeTypes;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.workflow.api.WorkflowInstance;
 
@@ -57,6 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -65,6 +69,7 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -170,7 +175,7 @@ public final class EventIndexUtils {
           org = (String) item.getValue();
           break;
         case EventIndexSchema.ACCESS_POLICY:
-          org = (String) item.getValue();
+          accessPolicy = (String) item.getValue();
           break;
         case EventIndexSchema.AGENT_CONFIGURATION:
           // TODO
@@ -180,7 +185,7 @@ public final class EventIndexUtils {
           agentId = (String) item.getValue();
           break;
         case EventIndexSchema.ARCHIVE_VERSION:
-          archiveVersion = (Long) item.getValue();
+          archiveVersion = Long.parseLong(item.getValue().toString());
           break;
         case EventIndexSchema.ATTACHMENT_FLAVOR:
           for (Object attachmentFlavor : item.getValues()) {
@@ -205,7 +210,7 @@ public final class EventIndexUtils {
           description = (String) item.getValue();
           break;
         case EventIndexSchema.DURATION:
-          duration = (Long) item.getValue();
+          duration = Long.parseLong(item.getValue().toString());
           break;
         case EventIndexSchema.END_DATE:
           recordingEndDate = (String) item.getValue();
@@ -253,11 +258,14 @@ public final class EventIndexUtils {
           }
           break;
         case EventIndexSchema.PUBLICATION:
-          // TODO: @see #generatePublicationDoc()
-//          for (Object publication: item.getValues()) {
-//            // TODO parse object
-//            publications.add(publication);
-//          }
+          for (Object valObj : item.getValues()) {
+            if (valObj instanceof Map) {
+              Map publicationFields = (Map) valObj;
+              Publication p = parsePublication(publicationFields);
+              if (p != null)
+                publications.add(p);
+            }
+          }
           break;
         case EventIndexSchema.PUBLISHER:
           publisher = (String) item.getValue();
@@ -328,7 +336,7 @@ public final class EventIndexUtils {
           workflowDefinitionId = (String) item.getValue();
           break;
         case EventIndexSchema.WORKFLOW_ID:
-          workflowId = (Long) item.getValue();
+          workflowId = Long.parseLong(item.getValue().toString());
           break;
         case EventIndexSchema.WORKFLOW_SCHEDULED_DATETIME:
           workflowScheduledDate = (String) item.getValue();
@@ -343,25 +351,26 @@ public final class EventIndexUtils {
           }
           break;
         default:
-          if (StringUtils.startsWith(EventIndexSchema.ACL_PERMISSION_PREFIX, item.getName())) {
-            // sample input:
-            //  "acl_permission_read": [
-            //    [
-            //      "ROLE_ADMIN",
-            //      "ROLE_USER"
-            //    ]
-            //  ],
-            //  "acl_permission_write": [
-            //    [
-            //      "ROLE_ADMIN",
-            //    ]
-            //  ],
-            String policy = StringUtils.replace(item.getName(), EventIndexSchema.ACL_PERMISSION_PREFIX, "", 1);
-//            for (Object roleStr : item.getValues()) {
+//          if (StringUtils.startsWith(item.getName(), EventIndexSchema.ACL_PERMISSION_PREFIX)) {
+//            // sample input:
+//            //  "acl_permission_read": [
+//            //    [
+//            //      "ROLE_ADMIN",
+//            //      "ROLE_USER"
+//            //    ]
+//            //  ],
+//            //  "acl_permission_write": [
+//            //    [
+//            //      "ROLE_ADMIN",
+//            //    ]
+//            //  ],
+//            String policy = StringUtils.replace(item.getName(), EventIndexSchema.ACL_PERMISSION_PREFIX, "", 1);
+//            Iterable roles = (Iterable) item.getValue();
+//            for (Object roleStr : roles) {
 //              String role = (String) roleStr;
 //              // TODO
 //            }
-          }
+//          }
           break;
       }
     }
@@ -643,6 +652,104 @@ public final class EventIndexUtils {
     pMap.put(PublicationIndexSchema.TRACK, tracksArray);
 
     return pMap;
+  }
+
+  private static Publication parsePublication(Map<String, Object> publicationFields) {
+    String channel = null;
+    MimeType mimeType = null;
+
+    if (publicationFields.containsKey(PublicationIndexSchema.CHANNEL))
+      channel = (String) publicationFields.get(PublicationIndexSchema.CHANNEL);
+
+    if (publicationFields.containsKey(PublicationIndexSchema.MIMETYPE)) {
+      String mimeTypeStr = (String) publicationFields.get(PublicationIndexSchema.MIMETYPE);
+      if (StringUtils.isNotBlank(mimeTypeStr))
+        mimeType = MimeTypes.parseMimeType(mimeTypeStr);
+    }
+    if (StringUtils.isBlank(channel))
+      return null;
+
+    Publication p = PublicationImpl.publication(null, channel, null, mimeType);
+    if (publicationFields.containsKey(PublicationIndexSchema.ATTACHMENT)
+            && publicationFields.get(PublicationIndexSchema.ATTACHMENT) != null) {
+      for (Object attachmentObj : (Iterable) publicationFields.get(PublicationIndexSchema.ATTACHMENT)) {
+        if (!(attachmentObj instanceof Map)) {
+          logger.debug("Unable to parse an attachment: {}", Objects.toString(attachmentObj));
+          continue;
+        }
+        Map attachmentFields = (Map) attachmentObj;
+        Attachment attachment = new AttachmentImpl();
+        String attachmentId = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_ID, null);
+        attachment.setIdentifier(attachmentId);
+        String attachmentUrl = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_URL, null);
+        if (StringUtils.isNotBlank(attachmentUrl)) {
+          attachment.setURI(URI.create(attachmentUrl));
+        }
+        String attachmentMimetype = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_MIMETYPE, null);
+        if (StringUtils.isNoneBlank(attachmentMimetype)) {
+          attachment.setMimeType(MimeTypes.parseMimeType(attachmentMimetype));
+        }
+        if (attachmentFields.containsKey(PublicationIndexSchema.ELEMENT_SIZE)) {
+          Object attachmentSizeObj = attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_SIZE, null);
+          try {
+            attachment.setSize(Long.parseLong(attachmentSizeObj.toString()));
+          } catch (NumberFormatException e) {
+            logger.warn("Unable to parse attachment size: {}", Objects.toString(attachmentSizeObj));
+          }
+        }
+        Object attachmentTags = attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_TAG, null);
+        if (attachmentTags != null) {
+          if (attachmentTags instanceof Iterable) {
+            for (Object tag : (Iterable) attachmentTags) {
+              attachment.addTag(Objects.toString(tag));
+            }
+          }
+        }
+//        String attachmentType = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_TYPE, null);
+        p.addAttachment(attachment);
+      }
+    }
+
+//    if (publicationFields.containsKey(PublicationIndexSchema.CATALOG)
+//            && publicationFields.get(PublicationIndexSchema.CATALOG) != null) {
+//      for (Object catalogObj : (Iterable) publicationFields.get(PublicationIndexSchema.CATALOG)) {
+//        if (!(catalogObj instanceof Map)) {
+//          logger.debug("Unable to parse an attachment: {}", Objects.toString(catalogObj));
+//          continue;
+//        }
+//        Map catalogFields = (Map) catalogObj;
+//        Catalog attachment = new CatalogImpl();
+//        String attachmentId = (String) catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_ID, null);
+//        attachment.setIdentifier(attachmentId);
+//        String attachmentUrl = (String) catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_URL, null);
+//        if (StringUtils.isNotBlank(attachmentUrl)) {
+//          attachment.setURI(URI.create(attachmentUrl));
+//        }
+//        String attachmentMimetype = (String) catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_MIMETYPE, null);
+//        if (StringUtils.isNoneBlank(attachmentMimetype)) {
+//          attachment.setMimeType(MimeTypes.parseMimeType(attachmentMimetype));
+//        }
+//        if (catalogFields.containsKey(PublicationIndexSchema.ELEMENT_SIZE)) {
+//          Object attachmentSizeObj = catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_SIZE, null);
+//          try {
+//            attachment.setSize(Long.parseLong(attachmentSizeObj.toString()));
+//          } catch (NumberFormatException e) {
+//            logger.warn("Unable to parse attachment size: {}", Objects.toString(attachmentSizeObj));
+//          }
+//        }
+//        Object attachmentTags = catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_TAG, null);
+//        if (attachmentTags != null) {
+//          if (attachmentTags instanceof Iterable) {
+//            for (Object tag : (Iterable) attachmentTags) {
+//              attachment.addTag(Objects.toString(tag));
+//            }
+//          }
+//        }
+//        //        String attachmentType = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_TYPE, null);
+//        p.addAttachment(attachment);
+//      }
+//    }
+    return p;
   }
 
   /**

@@ -52,15 +52,12 @@ public interface PublicationIndexSchema extends IndexSchema {
   String ELEMENT_TAG = "tag";
 
   /** The element url */
-  String ELEMENT_URL = "tag";
+  String ELEMENT_URL = "url";
 
   /** The element size */
   String ELEMENT_SIZE = "size";
 
   /** The duration for the track element */
   String TRACK_DURATION = "duration";
-
-  /** The transport for the track element */
-  String TRACK_TRANSPORT = "transport";
 
 }

@@ -81,6 +81,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -500,15 +501,10 @@ public abstract class AbstractSearchIndex extends AbstractElasticsearchIndex {
     SearchRequestBuilder requestBuilder = getSearchRequestBuilder(query, new EventQueryBuilder(query));
 
     try {
-      Unmarshaller unmarshaller = Event.createUnmarshaller();
       return executeQuery(query, requestBuilder, new Fn<SearchMetadataCollection, Event>() {
         @Override
         public Event apply(SearchMetadataCollection metadata) {
-          try {
-            return EventIndexUtils.toRecordingEvent(metadata, unmarshaller);
-          } catch (IOException e) {
-            return chuck(e);
-          }
+          return EventIndexUtils.toEvent(metadata);
         }
       });
     } catch (Throwable t) {
@@ -559,15 +555,10 @@ public abstract class AbstractSearchIndex extends AbstractElasticsearchIndex {
     // Create the request builder
     SearchRequestBuilder requestBuilder = getSearchRequestBuilder(query, new SeriesQueryBuilder(query));
     try {
-      Unmarshaller unmarshaller = Series.createUnmarshaller();
       return executeQuery(query, requestBuilder, new Fn<SearchMetadataCollection, Series>() {
         @Override
         public Series apply(SearchMetadataCollection metadata) {
-          try {
-            return SeriesIndexUtils.toSeries(metadata, unmarshaller);
-          } catch (IOException e) {
-            return chuck(e);
-          }
+          return SeriesIndexUtils.toSeries(metadata);
         }
       });
     } catch (Throwable t) {
@@ -662,31 +653,52 @@ public abstract class AbstractSearchIndex extends AbstractElasticsearchIndex {
 
     // Walk through response and create new items with title, creator, etc:
     for (SearchHit doc : response.getHits()) {
-
       // Wrap the search resulting metadata
       SearchMetadataCollection metadata = new SearchMetadataCollection(doc.getType());
       metadata.setIdentifier(doc.getId());
 
-      for (SearchHitField field : doc.getFields().values()) {
-        String name = field.getName();
-        SearchMetadata<Object> m = new SearchMetadataImpl<>(name);
-        // TODO: Add values with more care (localized, correct type etc.)
-
-        // Add the field values
-        if (field.getValues().size() > 1) {
-          for (Object v : field.getValues()) {
-            m.addValue(v);
-          }
-        } else {
-          m.addValue(field.getValue());
-        }
-
-        // Add the metadata
-        metadata.add(m);
-      }
-
       // Get the score for this item
       float score = doc.getScore();
+
+      if (!doc.isSourceEmpty()) {
+        Map<String, Object> source = doc.getSource();
+
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+          String name = entry.getKey();
+          SearchMetadata<Object> m = new SearchMetadataImpl<>(name);
+          // TODO: Add values with more care (localized, correct type etc.)
+
+          // Add the field values
+          if (entry.getValue() instanceof Iterable) {
+            for (Object v : (Iterable)entry.getValue()) {
+              m.addValue(v);
+            }
+          } else {
+            m.addValue(entry.getValue());
+          }
+
+          // Add the metadata
+          metadata.add(m);
+        }
+      } else {
+        for (SearchHitField field : doc.getFields().values()) {
+          String name = field.getName();
+          SearchMetadata<Object> m = new SearchMetadataImpl<>(name);
+          // TODO: Add values with more care (localized, correct type etc.)
+
+          // Add the field values
+          if (field.getValues().size() > 1) {
+            for (Object v : field.getValues()) {
+              m.addValue(v);
+            }
+          } else {
+            m.addValue(field.getValue());
+          }
+
+          // Add the metadata
+          metadata.add(m);
+        }
+      }
 
       // Have the serializer in charge create a type-specific search result
       // item

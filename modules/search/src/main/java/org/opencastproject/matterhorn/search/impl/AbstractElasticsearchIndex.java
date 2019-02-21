@@ -568,13 +568,12 @@ public abstract class AbstractElasticsearchIndex implements SearchIndex {
 
     // Create the actual search query
     requestBuilder.setQuery(queryBuilder);
-    logger.debug("Searching for {}", requestBuilder.toString());
 
     // Make sure all fields are being returned
     if (query.getFields().length > 0) {
       requestBuilder.addFields(query.getFields());
     } else {
-      requestBuilder.addField("*");
+      requestBuilder.setFetchSource(true);
     }
 
     // Types
@@ -612,7 +611,7 @@ public abstract class AbstractElasticsearchIndex implements SearchIndex {
           break;
       }
     }
-
+    logger.debug("Search query: {}", requestBuilder);
     return requestBuilder;
   }
 
