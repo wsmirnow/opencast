@@ -60,4 +60,7 @@ public interface PublicationIndexSchema extends IndexSchema {
   /** The duration for the track element */
   String TRACK_DURATION = "duration";
 
+  /** The boolean value, weather the track is live (value is true) or not (value is false) */
+  String TRACK_IS_LIVE = "is_live";
+
 }

@@ -150,27 +150,41 @@
                     "track": {
                         "type": "nested",
                         "properties": {
+                            "id"  : { "type" : "string", "store" : "no" },
+                            "mimetype"  : { "type" : "string", "store" : "no" },
+                            "type"  : { "type" : "string", "store" : "no" },
+                            "tag": { "type" : "string", "store" : "no" },
+                            "url": { "type" : "string", "store" : "no" },
+                            "size": { "type" : "long", "store" : "no" },
+                            "checksum": {
+                                "type": "nested",
+                                "properties": {
+                                    "value": { "type" : "string", "store" : "no" },
+                                    "type": { "type" : "string", "store" : "no" }
+                                }
+                            },
                             "duration"  : { "type" : "long", "store" : "no" },
-                            "transport" : { "type": "string", "store": "no"},
+                            "is_live": { "type":  "boolean", "store":  "no" },
+                            "transport" : { "type": "string", "store": "no" },
                             "audio": {
                                 "type": "nested",
                                 "properties": {
-                                    "bitdepth": { "type": "integer", "store": "no"},
-                                    "channels": { "type": "integer", "store": "no"},
-                                    "samplingrate": { "type": "integer", "store": "no"},
-                                    "bitrate": { "type": "float", "store": "no"},
-                                    "peakleveldb": { "type": "float", "store": "no"},
-                                    "rmsleveldb": { "type": "float", "store": "no"},
-                                    "rmspeakdb": { "type": "float", "store": "no"}
+                                    "bitdepth": { "type": "integer", "store": "no" },
+                                    "channels": { "type": "integer", "store": "no" },
+                                    "samplingrate": { "type": "integer", "store": "no" },
+                                    "bitrate": { "type": "float", "store": "no" },
+                                    "peakleveldb": { "type": "float", "store": "no" },
+                                    "rmsleveldb": { "type": "float", "store": "no" },
+                                    "rmspeakdb": { "type": "float", "store": "no" }
                                 }
                             },
                             "video": {
                                 "type": "nested",
                                 "properties": {
-                                    "bitrate": { "type": "float", "store": "no"},
-                                    "framerate": { "type": "float", "store": "no"},
-                                    "resolution": { "type": "string", "store": "no"},
-                                    "scantype": { "type": "string", "store": "no"}
+                                    "bitrate": { "type": "float", "store": "no" },
+                                    "framerate": { "type": "float", "store": "no" },
+                                    "resolution": { "type": "string", "store": "no" },
+                                    "scantype": { "type": "string", "store": "no" }
                                 }
                             }
                         }

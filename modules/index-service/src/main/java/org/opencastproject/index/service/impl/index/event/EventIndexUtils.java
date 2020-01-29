@@ -32,12 +32,14 @@ import org.opencastproject.matterhorn.search.impl.SearchMetadataCollection;
 import org.opencastproject.mediapackage.Attachment;
 import org.opencastproject.mediapackage.Catalog;
 import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElement;
+import org.opencastproject.mediapackage.MediaPackageElementBuilderFactory;
 import org.opencastproject.mediapackage.Publication;
 import org.opencastproject.mediapackage.PublicationImpl;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.mediapackage.TrackSupport;
 import org.opencastproject.mediapackage.VideoStream;
-import org.opencastproject.mediapackage.attachment.AttachmentImpl;
+import org.opencastproject.mediapackage.track.TrackImpl;
 import org.opencastproject.metadata.dublincore.DCMIPeriod;
 import org.opencastproject.metadata.dublincore.DublinCore;
 import org.opencastproject.metadata.dublincore.EncodingSchemeUtils;
@@ -55,6 +57,7 @@ import org.opencastproject.util.NotFoundException;
 import org.opencastproject.workflow.api.WorkflowInstance;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -654,7 +657,7 @@ public final class EventIndexUtils {
     return pMap;
   }
 
-  private static Publication parsePublication(Map<String, Object> publicationFields) {
+  static Publication parsePublication(Map<String, Object> publicationFields) {
     String channel = null;
     MimeType mimeType = null;
 
@@ -670,86 +673,126 @@ public final class EventIndexUtils {
       return null;
 
     Publication p = PublicationImpl.publication(null, channel, null, mimeType);
+    MediaPackageElementBuilderFactory mpeFactory = MediaPackageElementBuilderFactory.newInstance();
     if (publicationFields.containsKey(PublicationIndexSchema.ATTACHMENT)
             && publicationFields.get(PublicationIndexSchema.ATTACHMENT) != null) {
       for (Object attachmentObj : (Iterable) publicationFields.get(PublicationIndexSchema.ATTACHMENT)) {
         if (!(attachmentObj instanceof Map)) {
-          logger.debug("Unable to parse an attachment: {}", Objects.toString(attachmentObj));
+          logger.debug("Unable to parse an attachment: {}", attachmentObj);
           continue;
         }
         Map attachmentFields = (Map) attachmentObj;
-        Attachment attachment = new AttachmentImpl();
-        String attachmentId = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_ID, null);
-        attachment.setIdentifier(attachmentId);
-        String attachmentUrl = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_URL, null);
-        if (StringUtils.isNotBlank(attachmentUrl)) {
-          attachment.setURI(URI.create(attachmentUrl));
+        try {
+          Attachment attachment = (Attachment) parsePublicationElement(mpeFactory, MediaPackageElement.Type.Attachment,
+                  attachmentFields);
+          p.addAttachment(attachment);
+        } catch (Exception e) {
+          logger.warn("Unable to parse an attachment", e);
         }
-        String attachmentMimetype = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_MIMETYPE, null);
-        if (StringUtils.isNoneBlank(attachmentMimetype)) {
-          attachment.setMimeType(MimeTypes.parseMimeType(attachmentMimetype));
-        }
-        if (attachmentFields.containsKey(PublicationIndexSchema.ELEMENT_SIZE)) {
-          Object attachmentSizeObj = attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_SIZE, null);
-          try {
-            attachment.setSize(Long.parseLong(attachmentSizeObj.toString()));
-          } catch (NumberFormatException e) {
-            logger.warn("Unable to parse attachment size: {}", Objects.toString(attachmentSizeObj));
-          }
-        }
-        Object attachmentTags = attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_TAG, null);
-        if (attachmentTags != null) {
-          if (attachmentTags instanceof Iterable) {
-            for (Object tag : (Iterable) attachmentTags) {
-              attachment.addTag(Objects.toString(tag));
-            }
-          }
-        }
-//        String attachmentType = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_TYPE, null);
-        p.addAttachment(attachment);
       }
     }
 
-//    if (publicationFields.containsKey(PublicationIndexSchema.CATALOG)
-//            && publicationFields.get(PublicationIndexSchema.CATALOG) != null) {
-//      for (Object catalogObj : (Iterable) publicationFields.get(PublicationIndexSchema.CATALOG)) {
-//        if (!(catalogObj instanceof Map)) {
-//          logger.debug("Unable to parse an attachment: {}", Objects.toString(catalogObj));
-//          continue;
-//        }
-//        Map catalogFields = (Map) catalogObj;
-//        Catalog attachment = new CatalogImpl();
-//        String attachmentId = (String) catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_ID, null);
-//        attachment.setIdentifier(attachmentId);
-//        String attachmentUrl = (String) catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_URL, null);
-//        if (StringUtils.isNotBlank(attachmentUrl)) {
-//          attachment.setURI(URI.create(attachmentUrl));
-//        }
-//        String attachmentMimetype = (String) catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_MIMETYPE, null);
-//        if (StringUtils.isNoneBlank(attachmentMimetype)) {
-//          attachment.setMimeType(MimeTypes.parseMimeType(attachmentMimetype));
-//        }
-//        if (catalogFields.containsKey(PublicationIndexSchema.ELEMENT_SIZE)) {
-//          Object attachmentSizeObj = catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_SIZE, null);
-//          try {
-//            attachment.setSize(Long.parseLong(attachmentSizeObj.toString()));
-//          } catch (NumberFormatException e) {
-//            logger.warn("Unable to parse attachment size: {}", Objects.toString(attachmentSizeObj));
-//          }
-//        }
-//        Object attachmentTags = catalogFields.getOrDefault(PublicationIndexSchema.ELEMENT_TAG, null);
-//        if (attachmentTags != null) {
-//          if (attachmentTags instanceof Iterable) {
-//            for (Object tag : (Iterable) attachmentTags) {
-//              attachment.addTag(Objects.toString(tag));
-//            }
-//          }
-//        }
-//        //        String attachmentType = (String) attachmentFields.getOrDefault(PublicationIndexSchema.ELEMENT_TYPE, null);
-//        p.addAttachment(attachment);
-//      }
-//    }
+    if (publicationFields.containsKey(PublicationIndexSchema.CATALOG)
+            && publicationFields.get(PublicationIndexSchema.CATALOG) != null) {
+      for (Object catalogObj : (Iterable) publicationFields.get(PublicationIndexSchema.CATALOG)) {
+        if (!(catalogObj instanceof Map)) {
+          logger.debug("Unable to parse a catalog: {}", catalogObj);
+          continue;
+        }
+        Map catalogFields = (Map) catalogObj;
+        try {
+          Catalog catalog = (Catalog) parsePublicationElement(mpeFactory, MediaPackageElement.Type.Catalog,
+                  catalogFields);
+          p.addCatalog(catalog);
+        } catch (Exception e) {
+          logger.warn("Unable to parse a catalog", e);
+        }
+      }
+    }
+
+    if (publicationFields.containsKey(PublicationIndexSchema.TRACK)
+            && publicationFields.get(PublicationIndexSchema.TRACK) != null) {
+      for (Object trackObj : (Iterable) publicationFields.get(PublicationIndexSchema.TRACK)) {
+        if (!(trackObj instanceof Map)) {
+          logger.debug("Unable to parse a track: {}", trackObj);
+          continue;
+        }
+        Map trackFields = (Map) trackObj;
+        try {
+          Track track = (Track) parsePublicationElement(mpeFactory, MediaPackageElement.Type.Track, trackFields);
+          p.addTrack(track);
+        } catch (Exception e) {
+          logger.warn("Unable to parse a track", e);
+        }
+      }
+    }
     return p;
+  }
+
+  static <T extends MediaPackageElement> T parsePublicationElement(MediaPackageElementBuilderFactory mpeFactory,
+          MediaPackageElement.Type type, Map<String, Object> elementFields) {
+    MediaPackageElement element;
+    String elementUrl = (String) elementFields.getOrDefault(PublicationIndexSchema.ELEMENT_URL, null);
+    if (StringUtils.isNotBlank(elementUrl)) {
+      URI elementUri = URI.create(elementUrl);
+      element = mpeFactory.newElementBuilder().elementFromURI(elementUri, type, null);
+    } else {
+      // uri is a mandatory field
+      throw new IllegalStateException("Mandatory publication element field uri not set");
+    }
+
+    String elementId = (String) elementFields.getOrDefault(PublicationIndexSchema.ELEMENT_ID, null);
+    element.setIdentifier(elementId);
+    String elementMimetype = (String) elementFields.getOrDefault(PublicationIndexSchema.ELEMENT_MIMETYPE, null);
+    if (StringUtils.isNoneBlank(elementMimetype)) {
+      element.setMimeType(MimeTypes.parseMimeType(elementMimetype));
+    }
+    if (elementFields.containsKey(PublicationIndexSchema.ELEMENT_SIZE)) {
+      Object elementSize = elementFields.getOrDefault(PublicationIndexSchema.ELEMENT_SIZE, null);
+      try {
+        element.setSize(Long.parseLong(elementSize.toString()));
+      } catch (NumberFormatException e) {
+        logger.warn("Unable to parse publication element size: {}", elementSize);
+      }
+    }
+    Object elementTags = elementFields.getOrDefault(PublicationIndexSchema.ELEMENT_TAG, null);
+    if (elementTags != null) {
+      if (elementTags instanceof Iterable) {
+        for (Object tag : (Iterable) elementTags) {
+          element.addTag(Objects.toString(tag));
+        }
+      }
+    }
+    // TODO parse element checksum
+    if (type == MediaPackageElement.Type.Track) {
+      if (element instanceof TrackImpl) {
+        TrackImpl trackImpl = (TrackImpl) element;
+        if (elementFields.containsKey(PublicationIndexSchema.TRACK_DURATION)) {
+          Object trackDuration = elementFields.getOrDefault(PublicationIndexSchema.TRACK_DURATION, null);
+          try {
+            trackImpl.setDuration(Long.parseLong(trackDuration.toString()));
+          } catch (NumberFormatException e) {
+            logger.warn("Unable to parse publication track duration: {}", trackDuration);
+          }
+        }
+        if (elementFields.containsKey(PublicationIndexSchema.TRACK_IS_LIVE)) {
+          Object trackIsLive = elementFields.getOrDefault(PublicationIndexSchema.TRACK_IS_LIVE, null);
+          if (trackIsLive != null) {
+            if (trackIsLive instanceof Boolean)
+              trackImpl.setLive((Boolean) trackIsLive);
+            else {
+//            try {
+//              trackImpl.setLive(BooleanUtils.toBoolean(trackIsLive)); // parse boolean
+//            } catch (NumberFormatException e) {
+//              logger.warn("Unable to parse publication track field is_live: {}", trackIsLive);
+//            }
+            }
+          }
+        }
+        // TODO parse track specific fields
+      }
+    }
+    return (T) element;
   }
 
   /**
