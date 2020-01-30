@@ -5,17 +5,19 @@
   <title>Publish the recording</title>
   <tags/>
   <description/>
+
   <configuration_panel/>
+
   <operations>
 
     <operation
-      id="select-tracks"
-      exception-handler-workflow="partial-error"
-      description="Preparing presenter (camera) audio and video work versions">
+        id="select-tracks"
+        exception-handler-workflow="partial-error"
+        description="Preparing presenter (camera) audio and video work versions">
       <configurations>
-        <configuration key="source-flavor">*/source</configuration>
+        <configuration key="source-flavor">*/prepared</configuration>
         <configuration key="target-flavor">*/work</configuration>
-        <configuration key="audio-muxing">duplicate</configuration>
+        <configuration key="target-tags">-archive</configuration>
       </configurations>
     </operation>
 
@@ -559,4 +561,5 @@
     </operation>
 
   </operations>
+
 </definition>
