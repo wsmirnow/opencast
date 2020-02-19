@@ -4,9 +4,7 @@
   <id>partial-theming</id>
   <title>Run theming operations on trimmed videos</title>
   <tags/>
-  <description>
-     Run theming operations on trimmed videos.
-  </description>
+  <description/>
   <configuration_panel/>
   <operations>
 
@@ -43,7 +41,30 @@
     </operation>
 
     <operation
+      id="tag"
+      if="NOT(${theme_active})"
+      description="Tag presenter video as themed">
+      <configurations>
+        <configuration key="source-flavors">presenter/trimmed</configuration>
+        <configuration key="target-flavor">presenter/themed</configuration>
+        <configuration key="copy">false</configuration>
+      </configurations>
+    </operation>
+
+    <operation
+      id="tag"
+      if="NOT(${theme_active})"
+      description="Tag presentation video as themed">
+      <configurations>
+        <configuration key="source-flavors">presentation/trimmed</configuration>
+        <configuration key="target-flavor">presentation/themed</configuration>
+        <configuration key="copy">false</configuration>
+      </configurations>
+    </operation>
+
+    <operation
       id="analyze-tracks"
+      if="${theme_active}"
       exception-handler-workflow="partial-error"
       description="Analyze trimmed tracks">
       <configurations>
@@ -51,100 +72,21 @@
       </configurations>
     </operation>
 
-    <!-- Create a title slide video if theme has active title slide -->
-
     <operation
-      id="image"
-      if="${theme_title_slide_active} AND NOT ${theme_title_slide_uploaded} AND ${presentation_trimmed_has_video}"
-      exception-handler-workflow="partial-error"
-      description="Extracting title slide image from presentation track">
+      id="include"
+      if="${theme_title_slide_active}"
+      description="Including title slide operations">
       <configurations>
-        <configuration key="source-flavor">presentation/trimmed</configuration>
-        <configuration key="target-flavor">branding/titleslide</configuration>
-        <configuration key="encoding-profile">player-preview.http</configuration>
-        <configuration key="time">1</configuration>
+        <configuration key="workflow-id">partial-theming-title-slide</configuration>
       </configurations>
     </operation>
 
     <operation
-      id="image"
-      if="${theme_title_slide_active} AND NOT ${theme_title_slide_uploaded} AND NOT ${presentation_trimmed_has_video} AND ${presenter_trimmed_has_video}"
-      exception-handler-workflow="partial-error"
-      description="Extracting title slide image from presenter track">
+      id="include"
+      if="${theme_watermark_active}"
+      description="Including watermark rendering operations">
       <configurations>
-        <configuration key="source-flavor">presenter/trimmed</configuration>
-        <configuration key="target-flavor">branding/titleslide</configuration>
-        <configuration key="encoding-profile">player-preview.http</configuration>
-        <configuration key="time">1</configuration>
-      </configurations>
-    </operation>
-
-    <operation
-      id="cover-image"
-      if="${theme_title_slide_active} AND (${presentation_trimmed_has_video} OR ${presenter_trimmed_has_video})"
-      exception-handler-workflow="partial-error"
-      description="Create title slide with metadata">
-      <configurations>
-        <configuration key="stylesheet">file://${karaf.etc}/branding/coverimage.xsl</configuration>
-        <configuration key="width">1920</configuration>
-        <configuration key="height">1080</configuration>
-        <configuration key="posterimage-flavor">branding/titleslide</configuration>
-        <configuration key="target-flavor">branding/titleslide+metadata</configuration>
-     </configurations>
-    </operation>
-
-    <operation
-      id="image-to-video"
-      if="${theme_title_slide_active} AND (${presentation_trimmed_has_video} OR ${presenter_trimmed_has_video})"
-      exception-handler-workflow="partial-error"
-      description="Create video with title slide">
-      <configurations>
-        <configuration key="source-flavor">branding/titleslide+metadata</configuration>
-        <configuration key="target-flavor">branding/titleslide+video</configuration>
-        <configuration key="duration">5</configuration>
-        <configuration key="profile">image-movie.work</configuration>
-      </configurations>
-    </operation>
-
-    <!-- Render watermark into presenter and presentation tracks -->
-
-    <operation
-      id="composite"
-      if="${theme_watermark_active} AND ${presenter_trimmed_video}"
-      exception-handler-workflow="partial-error"
-      description="Render watermark into presenter track">
-      <configurations>
-        <configuration key="source-flavor-lower">presenter/trimmed</configuration>
-        <configuration key="source-flavor-upper">not/available</configuration>
-        <configuration key="source-flavor-watermark">branding/watermark</configuration>
-        <configuration key="encoding-profile">composite.http</configuration>
-        <configuration key="target-flavor">presenter/branded</configuration>
-        <configuration key="output-resolution">lower</configuration>
-        <configuration key="output-background">0x000000FF</configuration>
-        <configuration key="layout-single">
-          {"horizontalCoverage":1.0,"anchorOffset":{"referring":{"left":1.0,"top":0.0},"reference":{"left":1.0,"top":0.0},"offset":{"x":0,"y":0}}};
-          ${theme_watermark_layout_variable}
-        </configuration>
-      </configurations>
-    </operation>
-
-    <operation
-      id="composite"
-      if="${theme_watermark_active} AND ${presentation_trimmed_video}"
-      exception-handler-workflow="partial-error"
-      description="Render watermark into presentation track">
-      <configurations>
-        <configuration key="source-flavor-lower">presentation/trimmed</configuration>
-        <configuration key="source-flavor-upper">not/available</configuration>
-        <configuration key="source-flavor-watermark">branding/watermark</configuration>
-        <configuration key="encoding-profile">composite.http</configuration>
-        <configuration key="target-flavor">presentation/branded</configuration>
-        <configuration key="output-resolution">lower</configuration>
-        <configuration key="output-background">0x000000FF</configuration>
-        <configuration key="layout-single">
-          {"horizontalCoverage":1.0,"anchorOffset":{"referring":{"left":1.0,"top":0.0},"reference":{"left":1.0,"top":0.0},"offset":{"x":0,"y":0}}};
-          ${theme_watermark_layout_variable}
-        </configuration>
+        <configuration key="workflow-id">partial-theming-watermark</configuration>
       </configurations>
     </operation>
 

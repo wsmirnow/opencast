@@ -162,32 +162,9 @@
 
     <operation
       id="include"
-      if="${theme_active}"
-      description="Theme trimmed videos">
+      description="Including theming operations">
       <configurations>
         <configuration key="workflow-id">partial-theming</configuration>
-      </configurations>
-    </operation>
-
-    <operation
-      id="tag"
-      if="NOT(${theme_active})"
-      description="Tag presenter video as themed">
-      <configurations>
-        <configuration key="source-flavors">presenter/trimmed</configuration>
-        <configuration key="target-flavor">presenter/themed</configuration>
-        <configuration key="copy">false</configuration>
-      </configurations>
-    </operation>
-
-    <operation
-      id="tag"
-      if="NOT(${theme_active})"
-      description="Tag presentation video as themed">
-      <configurations>
-        <configuration key="source-flavors">presentation/trimmed</configuration>
-        <configuration key="target-flavor">presentation/themed</configuration>
-        <configuration key="copy">false</configuration>
       </configurations>
     </operation>
 
