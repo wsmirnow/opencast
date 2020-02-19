@@ -16,6 +16,26 @@
   </state-mappings>
   <operations>
 
+    <operation
+      id="comment"
+      description="Resolving the cutting marker">
+      <configurations>
+        <configuration key="description">Recording has not been cut yet.</configuration>
+        <configuration key="reason">EVENTS.EVENTS.DETAILS.COMMENTS.REASONS.CUTTING</configuration>
+        <configuration key="action">resolve</configuration>
+      </configurations>
+    </operation>
+
+    <operation
+      id="comment"
+      description="Resolving the review marker">
+      <configurations>
+        <configuration key="description">Recording has not been reviewed yet.</configuration>
+        <configuration key="reason">EVENTS.EVENTS.DETAILS.COMMENTS.REASONS.REVIEW</configuration>
+        <configuration key="action">resolve</configuration>
+      </configurations>
+    </operation>
+
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
     <!-- Publish                                                           -->
     <!--                                                                   -->

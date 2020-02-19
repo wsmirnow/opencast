@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definition xmlns="http://workflow.opencastproject.org">
+
+  <id>retract</id>
+  <title>Retract</title>
+  <tags>
+    <tag>archive</tag>
+  </tags>
+  <description>Retract a recording</description>
+  <displayOrder>100</displayOrder>
+  <state-mappings>
+    <state-mapping state="running">EVENTS.EVENTS.STATE_MAPPING.RETRACTING</state-mapping>
+    <state-mapping state="failing">EVENTS.EVENTS.STATE_MAPPING.RETRACTING</state-mapping>
+  </state-mappings>
+  <configuration_panel/>
+  <operations>
+
+    <operation
+      id="retract-engage"
+      exception-handler-workflow="partial-error"
+      description="Retract recording from Engage">
+    </operation>
+
+    <operation
+      id="snapshot"
+      exception-handler-workflow="partial-error"
+      description="Archiving state of retracted recording">
+    </operation>
+
+    <operation
+      id="cleanup"
+      fail-on-error="false"
+      description="Remove temporary processing artifacts">
+      <configurations>
+        <configuration key="delete-external">false</configuration>
+        <configuration key="preserve-flavors">security/*</configuration>
+      </configurations>
+    </operation>
+
+  </operations>
+</definition>

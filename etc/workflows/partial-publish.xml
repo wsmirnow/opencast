@@ -11,10 +11,11 @@
     <operation
       id="select-tracks"
       exception-handler-workflow="partial-error"
-      description="Preparing presenter (camera) audio and video work versions">
+      description="Selecting audio/video streams for processing">
       <configurations>
         <configuration key="source-flavor">*/source</configuration>
         <configuration key="target-flavor">*/work</configuration>
+        <configuration key="target-tags">-archive</configuration>
         <configuration key="audio-muxing">duplicate</configuration>
       </configurations>
     </operation>
@@ -22,7 +23,7 @@
     <operation
       id="analyze-tracks"
       exception-handler-workflow="partial-error"
-      description="Analyze tracks in media package a set control variables">
+      description="Analyzing tracks in media package and setting control variables">
       <configurations>
         <configuration key="source-flavor">*/work</configuration>
       </configurations>
@@ -36,7 +37,8 @@
 
     <operation
       id="clone"
-      exception-handler-workflow="partial-error">
+      exception-handler-workflow="partial-error"
+      description="Creating working copy of the cutting information">
       <configurations>
         <configuration key="source-flavor">smil/cutting</configuration>
         <configuration key="target-flavor">smil/tmp</configuration>
@@ -45,7 +47,7 @@
 
     <operation id="editor"
       exception-handler-workflow="partial-error"
-      description="Cut the recording according to the edit decision list">
+      description="Cutting the recording according to the edit decision list">
       <configurations>
         <configuration key="source-flavors">*/work</configuration>
         <configuration key="smil-flavors">smil/tmp</configuration>
@@ -200,7 +202,7 @@
     <!-- to Engage player format                             -->
 
     <operation
-      id="compose"
+      id="encode"
       exception-handler-workflow="partial-error"
       description="Encoding videos to mp4 delivery format">
       <configurations>

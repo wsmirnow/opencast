@@ -32,7 +32,7 @@
     <!-- Transcode video previews -->
 
     <operation
-      id="compose"
+      id="encode"
       if="NOT (${presenter_source_video} AND ${presentation_source_video})"
       exception-handler-workflow="partial-error"
       description="Create single-stream video preview">
