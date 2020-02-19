@@ -18,16 +18,6 @@
           <input id="autoPublish" name="autoPublish" type="checkbox" class="configField" value="false" />
           <label for="autoPublish">Auto publish</label>
         </fieldset>
-        <!-- Hidden options -->
-        <!-- This options should not be visible to the user for a better user experience. -->
-        <!-- In most cases these properties are fix for your system.                      -->
-        <fieldset>
-          <input id="publishToEngage" name="publishToEngage" type="hidden" value="true" />
-          <input id="publishToApi" name="publishToApi" type="hidden" value="false" />
-          <input id="publishToOaiPmh" name="publishToOaiPmh" type="hidden" value="false" />
-          <input id="publishToAws" name="publishToAws" type="hidden" value="false" />
-          <input id="publishToYouTube" name="publishToYouTube" type="hidden" value="false" />
-        </fieldset>
       </div>
     ]]>
   </configuration_panel>
@@ -45,11 +35,6 @@
       description="Applying default configuration values">
       <configurations>
         <configuration key="autoPublish">false</configuration>
-        <configuration key="publishToEngage">true</configuration>
-        <configuration key="publishToApi">false</configuration>
-        <configuration key="publishToOaiPmh">false</configuration>
-        <configuration key="publishToAws">false</configuration>
-        <configuration key="publishToYouTube">false</configuration>
       </configurations>
     </operation>
 
@@ -171,9 +156,7 @@
         <!-- On systems without shared workspace or working file repository -->
         <!-- you want to set this option to true. -->
         <configuration key="delete-external">false</configuration>
-        <!-- FixMe Don't clean up ACLs until workflow service no longer looks for them in the WFR. -->
-        <!-- TODO test if this issue is fixed -->
-        <!-- <configuration key="preserve-flavors">security/*</configuration> -->
+        <configuration key="preserve-flavors">security/*</configuration>
       </configurations>
     </operation>
 
