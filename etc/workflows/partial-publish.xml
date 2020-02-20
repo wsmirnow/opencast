@@ -45,7 +45,8 @@
       </configurations>
     </operation>
 
-    <operation id="editor"
+    <operation
+      id="editor"
       exception-handler-workflow="partial-error"
       description="Cutting the recording according to the edit decision list">
       <configurations>

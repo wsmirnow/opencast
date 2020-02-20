@@ -15,8 +15,8 @@
     <![CDATA[
       <div id="workflow-configuration">
         <fieldset>
-          <input id="autoPublish" name="autoPublish" type="checkbox" class="configField" value="false" />
-          <label for="autoPublish">Auto publish</label>
+          <input id="straightToPublishing" name="straightToPublishing" type="checkbox" class="configField" value="false" />
+          <label for="straightToPublishing">Straight to publishing</label>
         </fieldset>
       </div>
     ]]>
@@ -34,7 +34,7 @@
       id="defaults"
       description="Applying default configuration values">
       <configurations>
-        <configuration key="autoPublish">false</configuration>
+        <configuration key="straightToPublishing">false</configuration>
       </configurations>
     </operation>
 
@@ -98,23 +98,11 @@
 
     <operation
       id="comment"
-      if="NOT ${autoPublish}"
+      if="NOT ${straightToPublishing}"
       description="Mark the recording for cutting">
       <configurations>
         <configuration key="description">Recording has not been cut yet.</configuration>
         <configuration key="reason">EVENTS.EVENTS.DETAILS.COMMENTS.REASONS.CUTTING</configuration>
-        <configuration key="action">create</configuration>
-      </configurations>
-    </operation>
-
-    <!-- Mark the recording for review -->
-
-    <operation
-      id="comment"
-      description="Mark the recording for review">
-      <configurations>
-        <configuration key="description">Recording has not been reviewed yet.</configuration>
-        <configuration key="reason">EVENTS.EVENTS.DETAILS.COMMENTS.REASONS.REVIEW</configuration>
         <configuration key="action">create</configuration>
       </configurations>
     </operation>
@@ -128,7 +116,7 @@
 
     <operation
       id="include"
-      if="${autoPublish}"
+      if="${straightToPublishing}"
       description="Publish the recording">
       <configurations>
         <configuration key="workflow-id">partial-publish</configuration>
@@ -139,7 +127,7 @@
 
     <operation
       id="snapshot"
-      if="${autoPublish}"
+      if="${straightToPublishing}"
       description="Archive publishing information">
       <configurations>
         <configuration key="source-tags">archive</configuration>
