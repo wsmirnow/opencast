@@ -125,6 +125,7 @@
 
     <operation
       id="silence"
+      if="NOT ${straightToPublishing}"
       fail-on-error="false"
       description="Detecting silence">
       <configurations>
@@ -139,6 +140,7 @@
 
     <operation
       id="tag"
+      if="NOT ${straightToPublishing}"
       description="Preparing silence detection for preview">
       <configurations>
         <configuration key="source-flavors">*/silence</configuration>
