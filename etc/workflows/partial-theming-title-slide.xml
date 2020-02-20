@@ -12,7 +12,7 @@
 
     <operation
       id="image"
-      if="NOT ${theme_title_slide_uploaded} AND ${presentation_trimmed_has_video}"
+      if="NOT ${theme_title_slide_uploaded} AND ${presentation_trimmed_video}"
       exception-handler-workflow="partial-error"
       description="Extracting title slide image from presentation track">
       <configurations>
@@ -25,7 +25,7 @@
 
     <operation
       id="image"
-      if="NOT ${theme_title_slide_uploaded} AND NOT ${presentation_trimmed_has_video} AND ${presenter_trimmed_has_video}"
+      if="NOT ${theme_title_slide_uploaded} AND NOT ${presentation_trimmed_video} AND ${presenter_trimmed_video}"
       exception-handler-workflow="partial-error"
       description="Extracting title slide image from presenter track">
       <configurations>
@@ -38,7 +38,7 @@
 
     <operation
       id="cover-image"
-      if="${presentation_trimmed_has_video} OR ${presenter_trimmed_has_video}"
+      if="${presentation_trimmed_video} OR ${presenter_trimmed_video}"
       exception-handler-workflow="partial-error"
       description="Create title slide with metadata">
       <configurations>
@@ -52,7 +52,7 @@
 
     <operation
       id="image-to-video"
-      if="${presentation_trimmed_has_video} OR ${presenter_trimmed_has_video}"
+      if="${presentation_trimmed_video} OR ${presenter_trimmed_video}"
       exception-handler-workflow="partial-error"
       description="Create video with title slide">
       <configurations>
