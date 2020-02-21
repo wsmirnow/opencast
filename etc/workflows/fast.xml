@@ -13,7 +13,6 @@
     sends the resulting distribution files, along with their associated metadata,
     to the distribution channels.
   </description>
-
   <configuration_panel>
     <![CDATA[
       <div id="workflow-configuration">
@@ -22,7 +21,10 @@
       </div>
     ]]>
   </configuration_panel>
-
+  <state-mappings>
+    <state-mapping state="running">EVENTS.EVENTS.STATE_MAPPING.PUBLISHING</state-mapping>
+    <state-mapping state="failing">EVENTS.EVENTS.STATE_MAPPING.PUBLISHING</state-mapping>
+  </state-mappings>
   <operations>
 
     <operation
@@ -189,7 +191,9 @@
       <configurations>
         <configuration key="source-flavors">*/preview</configuration>
         <configuration key="channel-id">internal</configuration>
-        <configuration key="url-pattern">http://localhost:8080/admin-ng/index.html#/events/events/${event_id}/tools/playback</configuration>
+        <configuration key="url-pattern">
+          ${org_org_opencastproject_admin_ui_url!'http://localhost:8080'}/admin-ng/index.html#/events/events/${event_id}/tools/editor
+        </configuration>
         <configuration key="check-availability">true</configuration>
       </configurations>
     </operation>
@@ -235,6 +239,4 @@
     </operation>
 
   </operations>
-
 </definition>
-
