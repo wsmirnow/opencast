@@ -22,6 +22,12 @@
       id="cleanup"
       fail-on-error="false"
       description="Cleaning up">
+      <configurations>
+        <!-- On systems without shared workspace or working file repository -->
+        <!-- you want to set this option to true. -->
+        <configuration key="delete-external">false</configuration>
+        <configuration key="preserve-flavors">security/*</configuration>
+      </configurations>
     </operation>
 
   </operations>

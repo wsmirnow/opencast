@@ -21,6 +21,8 @@
       description="Retract recording from Engage">
     </operation>
 
+    <!-- Here you can place operations to retract publication from your publication channels -->
+
     <operation
       id="snapshot"
       exception-handler-workflow="partial-error"

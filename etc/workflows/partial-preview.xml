@@ -55,7 +55,7 @@
         <configuration key="encoding-profile">mp4-preview.dual.http</configuration>
         <configuration key="target-flavor">composite/preview</configuration>
         <configuration key="target-tags">preview</configuration>
-        <configuration key="output-resolution">1280x400</configuration>
+        <configuration key="output-resolution">1280x360</configuration>
         <configuration key="output-background">0x000000FF</configuration>
         <configuration key="layout">preview</configuration>
         <configuration key="layout-preview">
@@ -81,7 +81,6 @@
         <configuration key="target-tags">preview</configuration>
       </configurations>
     </operation>
-
 
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
     <!-- Track previews                                                    -->

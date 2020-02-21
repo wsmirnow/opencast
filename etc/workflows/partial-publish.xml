@@ -156,7 +156,7 @@
     </operation>
 
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-    <!-- Apply the branding artifacts                                      -->
+    <!-- Apply theming                                                     -->
     <!--                                                                   -->
     <!-- Add trailer and bumper to the recording prior to publication.     -->
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
@@ -259,6 +259,8 @@
         <configuration key="check-availability">true</configuration>
       </configurations>
     </operation>
+
+    <!-- Here you can place operations to publish to your publication channels -->
 
   </operations>
 </definition>
