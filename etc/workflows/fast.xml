@@ -16,8 +16,8 @@
   <configuration_panel>
     <![CDATA[
       <div id="workflow-configuration">
-        <input id="publish" name="publish" type="checkbox" class="configField" value="true" checked=checked />
-        <label for="publish">Publish media directly</label>
+        <input id="straightToPublishing" name="straightToPublishing" type="checkbox" class="configField" value="true" checked=checked />
+        <label for="straightToPublishing">Straight to publishing</label>
       </div>
     ]]>
   </configuration_panel>
@@ -39,7 +39,7 @@
 
     <operation
       id="defaults"
-      if="${publish}"
+      if="${straightToPublishing}"
       description="Applying configuration values for publish workflow">
       <configurations>
         <configuration key="publishToMediaModule">true</configuration>
@@ -90,7 +90,7 @@
     <!-- skip this when manually uploaded */search+preview -->
     <operation
       id="image"
-      if="${publish}"
+      if="${straightToPublishing}"
       fail-on-error="true"
       exception-handler-workflow="partial-error"
       description="Creating Engage search result thumbnails">
@@ -107,7 +107,7 @@
 
     <operation
       id="image"
-      if="${publish}"
+      if="${straightToPublishing}"
       fail-on-error="true"
       exception-handler-workflow="partial-error"
       description="Creating Engage player preview image">
@@ -124,7 +124,7 @@
 
     <operation
       id="segment-video"
-      if="${publish}"
+      if="${straightToPublishing}"
       fail-on-error="false"
       exception-handler-workflow="partial-error"
       description="Detecting slide transitions in presentation track">
@@ -138,7 +138,7 @@
 
     <operation
       id="segmentpreviews"
-      if="${publish}"
+      if="${straightToPublishing}"
       fail-on-error="false"
       exception-handler-workflow="partial-error"
       description="Creating presentation segments preview image">
@@ -156,7 +156,7 @@
 
     <operation
       id="timelinepreviews"
-      if="${publish}"
+      if="${straightToPublishing}"
       fail-on-error="false"
       exception-handler-workflow="partial-error"
       description="Creating timeline preview images">
@@ -172,7 +172,7 @@
 
     <operation
       id="extract-text"
-      if="${publish}"
+      if="${straightToPublishing}"
       fail-on-error="false"
       exception-handler-workflow="partial-error"
       description="Extracting text from presentation segments">
@@ -202,7 +202,7 @@
 
     <operation
       id="publish-engage"
-      if="${publish}"
+      if="${straightToPublishing}"
       max-attempts="2"
       fail-on-error="true"
       exception-handler-workflow="partial-error"

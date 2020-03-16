@@ -87,6 +87,7 @@
     <!--                                                                   -->
     <!-- Create track previews for video editor stream selection feature   -->
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
     <operation
       id="image"
       exception-handler-workflow="partial-error"
