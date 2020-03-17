@@ -53,6 +53,7 @@
         <configuration key="source-flavor-lower">presentation/source</configuration>
         <configuration key="source-flavor-upper">presenter/source</configuration>
         <configuration key="encoding-profile">mp4-preview.dual.http</configuration>
+        <configuration key="source-audio-name">upper</configuration>
         <configuration key="target-flavor">composite/preview</configuration>
         <configuration key="target-tags">preview</configuration>
         <configuration key="output-resolution">1280x360</configuration>
