@@ -137,6 +137,31 @@ function loadPage(page) {
             'path-to-file' : track.url });
         }
       }
+
+      // Sort tracks by name. If names are the same, sort by description
+      buttonData.sort(function(a, b){
+        var nameA = a['download-button-name'].toLowerCase(),
+            nameB = b['download-button-name'].toLowerCase();
+        var descA = a['download-button-description'].toLowerCase(),
+            descB = b['download-button-description'].toLowerCase();
+
+        if(nameA > nameB) {
+          return 1;
+        }
+        if(nameB > nameA) {
+          return -1;
+        }
+
+        if(descA > descB) {
+          return 1;
+        }
+        if(descB > descA) {
+          return -1;
+        }
+
+        return 0;
+      });
+
       tpldata['download'] = buttonData;
 
       // render template
