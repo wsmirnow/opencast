@@ -76,6 +76,28 @@ function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function sortResolutions(descA, descB) {
+  var descAWidth = parseInt(descA.split('x')[0]);
+  var descBWidth = parseInt(descB.split('x')[0]);
+  if(descAWidth > descBWidth) {
+    return -1;  // Returns descB
+  }
+  if(descBWidth > descAWidth) {
+    return 1;
+  }
+
+  var descAHeight = parseInt(descA.split('x')[1]);
+  var descBHeight = parseInt(descB.split('x')[1]);
+  if(descAHeight > descBHeight) {
+    return -1;
+  }
+  if(descBHeight > descAHeight) {
+    return 1;
+  }
+
+  return 0;
+}
+
 // Called by the HTML. Only exists to "hide" the static download URLs in this js.
 function getLink(index) { // eslint-disable-line no-unused-vars
   if (typeof downloadLinks !== 'undefined') {
@@ -168,14 +190,7 @@ function loadPage(page) {
           return -1;
         }
 
-        if(descA > descB) {
-          return 1;
-        }
-        if(descB > descA) {
-          return -1;
-        }
-
-        return 0;
+        return sortResolutions(descA, descB);
       });
 
       tpldata['download'] = buttonData;
