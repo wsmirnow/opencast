@@ -28,7 +28,8 @@ const player = '/play/';
 var currentpage,
     defaultLang = i18ndata['en-US'],
     lang = defaultLang;
-var downloadLinks;  // Key-Value pairs (Index: URL)
+var downloadLinks = [];  // Key-Value pairs (Index: URL)
+var downloadIndex = 0;
 
 function matchLanguage(lang) {
   // break for too short codes
@@ -76,7 +77,7 @@ function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function sortResolutions(descA, descB) {
+function sortResolutions(descA, descB) { // eslint-disable-line no-unused-vars
   var descAWidth = parseInt(descA.split('x')[0]);
   var descBWidth = parseInt(descB.split('x')[0]);
   if(descAWidth > descBWidth) {
@@ -157,22 +158,20 @@ function loadPage(page) {
       // Download buttons
       // Create a button for each track that contains a link to a mp4 or webm
       var buttonData = [];
-      var index = 0;
-      downloadLinks = [];
       var tracks = episode.mediapackage.media.track;
       tracks = Array.isArray(tracks) ? tracks : [tracks];
       for (const track of tracks) {
         if( track.url.endsWith('mp4') || track.url.endsWith('webm')) {
 
           // Store links in global var
-          downloadLinks[index] = track.url;
-          index++;
+          downloadIndex++;
+          downloadLinks[downloadIndex] = track.url;
 
           // Collect output to mustache
           buttonData.push ({
             'download-button-name' : capitalize( track.type.split('/')[0] ),
             'download-button-description': track.video.resolution,
-            'download-index': index});
+            'download-index': downloadIndex});
         }
       }
 
