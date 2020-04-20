@@ -37,7 +37,7 @@
       <button class=drop-button>Direct Download</button>
       <div class=dropdown-content>
       {{#download}}
-        <a href={{path-to-file}} download>
+        <a href="javascript:getLink({{download-index}})" download>
           {{download-button-name}}<br />
           {{download-button-description}}
         </a>
