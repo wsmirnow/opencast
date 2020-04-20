@@ -103,7 +103,19 @@ function sortResolutions(descA, descB) { // eslint-disable-line no-unused-vars
 function getLink(index) { // eslint-disable-line no-unused-vars
   if (typeof downloadLinks !== 'undefined') {
     if(downloadLinks.length > index && index >= 0) {
-      window.location.href = downloadLinks[index];
+      // Option 1: Open a new window. Safe, should be supported everywhere.
+      //window.location.href = downloadLinks[index];
+
+      // Option 2: Create a temporary HTML element. Probably fine, seems kinda hacky?
+      // Creating an invisible element
+      var element = document.createElement('a');
+      element.setAttribute('href', downloadLinks[index]);                       // filepath
+      element.setAttribute('download', downloadLinks[index].split('/').pop());  // filename
+
+      // Add the element, click it and remove it before anyone notices it was even there
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
     }
   }
 }
