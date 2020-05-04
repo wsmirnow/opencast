@@ -1,4 +1,5 @@
 {
   "RESULTS": "Ergebnisse {{{range.begin}}}-{{{range.end}}} von {{{total}}}",
-  "CREATOR": "von {{{creator}}}"
+  "CREATOR": "von {{{creator}}}",
+  "DOWNLOADBUTTON": "Direkt Runterladen"
 }

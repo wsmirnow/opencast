@@ -150,11 +150,13 @@ function loadPage(page) {
     for (var i = 0; i < results.length; i++) {
       var episode = results[i],
           i18ncreator = Mustache.render(i18n('CREATOR'), {creator: episode.dcCreator}),
+          i18nDownloadButton = Mustache.render(i18n('DOWNLOADBUTTON')),
           template = $('#template-episode').html(),
           tpldata = {
             player: player + episode.id,
             title: episode.dcTitle,
             i18ncreator: i18ncreator,
+            i18nDownloadButton: i18nDownloadButton,
             created: tryLocalDate(episode.dcCreated)};
 
       // get preview image
