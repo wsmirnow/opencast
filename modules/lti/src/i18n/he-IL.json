@@ -1,4 +1,5 @@
 {
   "RESULTS": "תוצאות {{{range.begin}}}-{{{range.end}}} מתוך {{{total}}}",
-  "CREATOR": "על ידי {{{creator}}}"
+  "CREATOR": "על ידי {{{creator}}}",
+  "DOWNLOADBUTTON": "  הורדה ישירה"
 }
