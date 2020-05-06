@@ -28,6 +28,7 @@ div.episode-container {
   flex-wrap: wrap;
   background-color: #eee;
   margin: 15px;
+  justify-content: flex-end
 }
 
 a.episode {
@@ -46,7 +47,7 @@ a.episode:hover {
 
 a.episode div {
   display: inline-block;
-  padding: 20px;
+  padding: 10px;
 }
 
 a.episode div.preview {
