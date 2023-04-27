@@ -29,5 +29,4 @@ Documentation for modules included in Opencast.
     * [AWS AutoScaling](terminationstate.aws.autoscaling.md)
 * [Transcripts (Google Speech)](googlespeechtranscripts.md)
 * [Transcripts (IBM Watson)](watsontranscripts.md)
-* [Transcripts (Microsoft Azure)](microsoftazuretranscripts.md)
 * [YouTube Publication](youtubepublication.md)
