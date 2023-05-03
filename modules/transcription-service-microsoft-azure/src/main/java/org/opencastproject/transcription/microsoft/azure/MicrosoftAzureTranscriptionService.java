@@ -260,11 +260,8 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     }
     //// assure azure storage container exists
     try {
-      boolean containerExists = azureStorageClient.containerExists(mpId, azureContainerName);
-      if (!containerExists) {
-        azureStorageClient.createContainer(mpId, azureContainerName);
-      }
-    } catch (IOException | MicrosoftAzureStorageClientException e) {
+      azureStorageClient.createContainer(mpId, azureContainerName);
+    } catch (IOException | MicrosoftAzureStorageClientException | MicrosoftAzureNotAllowedException e) {
       throw new TranscriptionServiceException(String.format(
           "Unable to query or create a storage container '%s' on Microsoft Azure.", azureContainerName), e);
     }

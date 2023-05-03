@@ -31,6 +31,7 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.slf4j.Logger;
@@ -38,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -79,14 +81,19 @@ public class MicrosoftAzureStorageClient {
   }
 
   public boolean containerExists(String mpId, String azureContainerName)
-          throws MicrosoftAzureStorageClientException, IOException {
-    Map<String, String> containerProperties = getContainerProperties(mpId, azureContainerName);
-    return containerProperties.containsKey("x-ms-blob-public-access")
-        && StringUtils.equalsIgnoreCase("unlocked", containerProperties.getOrDefault("x-ms-lease-status", "INVALID"));
+          throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException {
+    try {
+      Map<String, String> containerProperties = getContainerProperties(mpId, azureContainerName);
+      return containerProperties.containsKey("x-ms-blob-public-access") && StringUtils.equalsIgnoreCase("unlocked",
+          containerProperties.getOrDefault("x-ms-lease-status", "INVALID"));
+    } catch (MicrosoftAzureNotFoundException ex) {
+      return false;
+    }
   }
 
   public Map<String, String> getContainerProperties(String mpId, String azureContainerName)
-          throws MicrosoftAzureStorageClientException, IOException {
+          throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException,
+          MicrosoftAzureNotFoundException {
     String containerUrl = String.format("https://%s.%s/%s?%s", azureStorageAccountName, azureBlobStoreUrlSuffix,
         StringUtils.trimToEmpty(azureContainerName), "restype=container");
     String sasToken = generateAccountSASToken("r", "c",
@@ -102,15 +109,53 @@ public class MicrosoftAzureStorageClient {
       switch (code) {
         case HttpStatus.SC_OK: // 200
           break;
+        case HttpStatus.SC_FORBIDDEN: // 403
+          throw new MicrosoftAzureNotAllowedException(String.format(
+              "Not allowed to read Azure storage container properties for container %s. Microsoft error code: %s",
+              azureContainerName, headersMap.getOrDefault("x-ms-error-code", "UNKNOWN")));
+        case HttpStatus.SC_NOT_FOUND: // 404
+          throw new MicrosoftAzureNotFoundException(String.format(
+              "Azure storage container %s does not exists. Microsoft error code: %s",
+              azureContainerName, headersMap.getOrDefault("x-ms-error-code", "UNKNOWN")));
         default:
           throw new MicrosoftAzureStorageClientException(String.format(
-              "Getting Azure storage container metadata failed with HTTP response code %d", code));
+              "Getting Azure storage container metadata failed with HTTP response code %d. Microsoft error code: %s",
+              code,  headersMap.getOrDefault("x-ms-error-code", "UNKNOWN")));
       }
       return headersMap;
     }
   }
 
-  public void createContainer(String mpId, String azureContainerName) throws MicrosoftAzureStorageClientException {
+  public void createContainer(String mpId, String azureContainerName)
+          throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException {
+    if (containerExists(mpId, azureContainerName)) {
+      return;
+    }
+    String containerUrl = String.format("https://%s.%s/%s?%s", azureStorageAccountName, azureBlobStoreUrlSuffix,
+        StringUtils.trimToEmpty(azureContainerName), "restype=container");
+    String sasToken = generateAccountSASToken("w", "c",
+        null, null, null, null);
+    containerUrl = containerUrl + "&" + sasToken;
+    try (CloseableHttpClient httpClient = makeHttpClient(CONNECTION_TIMEOUT, SOCKET_TIMEOUT, CONNECTION_TIMEOUT)) {
+      HttpPut httpPut = new HttpPut(containerUrl);
+      httpPut.addHeader("x-ms-blob-public-access", "blob");
+      CloseableHttpResponse response = httpClient.execute(httpPut);
+      int code = response.getStatusLine().getStatusCode();
+      Map<String, String> headersMap = Arrays.stream(response.getAllHeaders())
+          .collect(Collectors.toMap(NameValuePair::getName, NameValuePair::getValue));
+      switch (code) {
+        case HttpStatus.SC_CREATED: // 201
+          break;
+        case HttpStatus.SC_FORBIDDEN: // 403
+          throw new MicrosoftAzureNotAllowedException(String.format(
+              "Not allowed to read Azure storage container properties for container %s. Microsoft error code: %s",
+              azureContainerName, headersMap.getOrDefault("x-ms-error-code", "UNKNOWN")));
+        default:
+          throw new MicrosoftAzureStorageClientException(String.format(
+              "Creating Azure storage container failed with HTTP response code %d. Microsoft error code: %s", code,
+              headersMap.getOrDefault("x-ms-error-code", "UNKNOWN")));
+      }
+    }
   }
 
   public String uploadFile(String mpId, File trackFile, String azureContainerName, String azureBlobPath)
@@ -178,95 +223,7 @@ public class MicrosoftAzureStorageClient {
         Base64.decodeBase64(azureAccountAccessKey));
     byte[] signedString = initializedMac.doFinal(stringToSign.getBytes(StandardCharsets.UTF_8));
     String signature = Base64.encodeBase64String(signedString);
-    queryArgs.add("sig=" + signature);
-    return StringUtils.joinWith("&", queryArgs.toArray());
-  }
-
-  String generateSASToken(@NotNull String signedPermissions, Date signedStart, Date signedExpiry,
-      @NotNull String canonicalizedResource, String signedIdentifier, String signedIP, @NotNull String signedResource,
-      String signedSnapshotTime, String rscc, String rscd, String rsce, String rscl, String rsct) {
-    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-    df.setTimeZone(TimeZone.getTimeZone("UTC"));
-    List<String> queryArgs = new ArrayList<>();
-    StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(signedPermissions + "\n");
-    queryArgs.add("sp=" + signedPermissions);
-    if (signedStart == null) {
-      Date startDate = new Date(Calendar.getInstance().getTimeInMillis() + (-15 * MILLIS_IN_A_MINUTE));
-      stringBuilder.append(df.format(startDate) + "\n");
-      queryArgs.add("st=" + df.format(startDate));
-    } else {
-      stringBuilder.append(df.format(signedStart) + "\n");
-      queryArgs.add("st=" + df.format(signedStart));
-    }
-    if (signedExpiry == null) {
-      Date endDate = new Date(Calendar.getInstance().getTimeInMillis() + MILLIS_IN_A_DAY);
-      stringBuilder.append(df.format(endDate) + "\n");
-      queryArgs.add("se=" + df.format(endDate));
-    } else {
-      stringBuilder.append(df.format(signedExpiry) + "\n");
-      queryArgs.add("se=" + df.format(signedExpiry));
-    }
-    stringBuilder.append(canonicalizedResource + "\n");
-    if (StringUtils.isNotBlank(signedIdentifier)) {
-      stringBuilder.append(signedIdentifier + "\n");
-      queryArgs.add("si=" + signedIdentifier);
-    } else {
-      stringBuilder.append("\n");
-    }
-    if (StringUtils.isNotBlank(signedIP)) {
-      stringBuilder.append(signedIP + "\n");
-      queryArgs.add("sip=" + signedIP);
-    } else {
-      stringBuilder.append("\n");
-    }
-    stringBuilder.append("https" + "\n");
-    queryArgs.add("spr=" + "https");
-    stringBuilder.append(azureStorageVersion + "\n");
-    queryArgs.add("sv=" + azureStorageVersion);
-    stringBuilder.append(signedResource + "\n");
-    queryArgs.add("sr=" + signedResource);
-    if (StringUtils.isNotBlank(signedSnapshotTime)) {
-      stringBuilder.append(signedSnapshotTime + "\n");
-      //queryArgs.add("=" + signedSnapshotTime);
-    } else {
-      stringBuilder.append("\n");
-    }
-    if (StringUtils.isNotBlank(rscc)) {
-      stringBuilder.append(rscc + "\n");
-      //queryArgs.add("=" + rscc);
-    } else {
-      stringBuilder.append("\n");
-    }
-    if (StringUtils.isNotBlank(rscd)) {
-      stringBuilder.append(rscd + "\n");
-      //queryArgs.add("=" + rscd);
-    } else {
-      stringBuilder.append("\n");
-    }
-    if (StringUtils.isNotBlank(rsce)) {
-      stringBuilder.append(rsce + "\n");
-      //queryArgs.add("=" + rsce);
-    } else {
-      stringBuilder.append("\n");
-    }
-    if (StringUtils.isNotBlank(rscl)) {
-      stringBuilder.append(rscl + "\n");
-      //queryArgs.add("=" + rscl);
-    } else {
-      stringBuilder.append("\n");
-    }
-    if (StringUtils.isNotBlank(rsct)) {
-      stringBuilder.append(rsct);
-      //queryArgs.add("=" + rsct);
-    }
-    String stringToSign = stringBuilder.toString();
-
-    Mac initializedMac = HmacUtils.getInitializedMac(HmacAlgorithms.HMAC_SHA_256,
-        Base64.decodeBase64(azureAccountAccessKey));
-    byte[] signedString = initializedMac.doFinal(stringToSign.getBytes(StandardCharsets.UTF_8));
-    String signature = Base64.encodeBase64String(signedString);
-    queryArgs.add("sig=" + signature);
+    queryArgs.add("sig=" + URLEncoder.encode(signature, StandardCharsets.UTF_8));
     return StringUtils.joinWith("&", queryArgs.toArray());
   }
 

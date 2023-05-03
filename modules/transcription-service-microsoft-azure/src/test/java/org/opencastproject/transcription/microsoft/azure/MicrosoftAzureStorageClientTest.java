@@ -72,14 +72,19 @@ public class MicrosoftAzureStorageClientTest {
   }
 
   @Test
-  public void containerExists() {
+  public void containerExists()
+          throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException {
     if (!enabled) {
       return;
     }
+    boolean containerExists = azureStorageClient.containerExists("mp1", "opencast-transcriptions");
+    Assert.assertTrue(containerExists);
   }
 
   @Test
-  public void getContainerProperties() throws MicrosoftAzureStorageClientException, IOException {
+  public void getContainerProperties()
+          throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotFoundException,
+          MicrosoftAzureNotAllowedException {
     if (!enabled) {
       return;
     }
@@ -90,10 +95,12 @@ public class MicrosoftAzureStorageClientTest {
   }
 
   @Test
-  public void createContainer() {
+  public void createContainer()
+          throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException {
     if (!enabled) {
       return;
     }
+    azureStorageClient.createContainer("mp1", "opencast-transcriptions2");
   }
 
   @Test
@@ -118,6 +125,6 @@ public class MicrosoftAzureStorageClientTest {
     Assert.assertTrue(sasToken.contains("st=2023-01-15T11:00:00Z"));
     Assert.assertTrue(sasToken.contains("se=2023-01-16T11:00:00Z"));
     Assert.assertTrue(sasToken.contains("spr=https"));
-    Assert.assertTrue(sasToken.contains("sig=bX6zT1PlwSahNOJAjSARoRyvZ6fHPJGKvAqBdAJx8/4="));
+    Assert.assertTrue(sasToken.contains("sig=bX6zT1PlwSahNOJAjSARoRyvZ6fHPJGKvAqBdAJx8%2F4%3D"));
   }
 }

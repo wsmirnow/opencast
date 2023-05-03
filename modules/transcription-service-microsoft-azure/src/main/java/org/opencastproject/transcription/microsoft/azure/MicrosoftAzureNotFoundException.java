@@ -19,16 +19,16 @@
  *
  */
 package org.opencastproject.transcription.microsoft.azure;
-public class MicrosoftAzureStorageClientException extends Throwable {
-  public MicrosoftAzureStorageClientException(String message) {
+public class MicrosoftAzureNotFoundException extends Throwable {
+  public MicrosoftAzureNotFoundException(String message) {
     super(message);
   }
 
-  public MicrosoftAzureStorageClientException(Throwable e) {
+  public MicrosoftAzureNotFoundException(Throwable e) {
     super(e);
   }
 
-  public MicrosoftAzureStorageClientException(String message, Throwable e) {
+  public MicrosoftAzureNotFoundException(String message, Throwable e) {
     super(message, e);
   }
 }
