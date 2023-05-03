@@ -28,10 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.Map;
-import java.util.TimeZone;
 
 public class MicrosoftAzureStorageClientTest {
 
@@ -68,7 +65,8 @@ public class MicrosoftAzureStorageClientTest {
 //    }
     enabled = StringUtils.isNotBlank(azureStorageAccountName)
         && StringUtils.isNotBlank(azureAccountAccessKey);
-    azureStorageClient = new MicrosoftAzureStorageClient(azureStorageAccountName, azureAccountAccessKey);
+    azureStorageClient = new MicrosoftAzureStorageClient(new MicrosoftAzureAuthorization(azureStorageAccountName,
+        azureAccountAccessKey));
   }
 
   @Test
@@ -108,23 +106,5 @@ public class MicrosoftAzureStorageClientTest {
     if (!enabled) {
       return;
     }
-  }
-
-  @Test
-  public void generateAccountSASToken() {
-    Calendar c = Calendar.getInstance();
-    c.set(2023,Calendar.JANUARY,15,12,0,0);
-    c.setTimeZone(TimeZone.getTimeZone("GMT+1"));
-    Date start = c.getTime();
-    c.set(2023,Calendar.JANUARY,16,12,0,0);
-    Date end = c.getTime();
-    String sasToken = azureStorageClient.generateAccountSASToken("r", "c", start, end, null, null);
-    Assert.assertNotNull(sasToken);
-    Assert.assertTrue(sasToken.contains("sp=r"));
-    Assert.assertTrue(sasToken.contains("srt=c"));
-    Assert.assertTrue(sasToken.contains("st=2023-01-15T11:00:00Z"));
-    Assert.assertTrue(sasToken.contains("se=2023-01-16T11:00:00Z"));
-    Assert.assertTrue(sasToken.contains("spr=https"));
-    Assert.assertTrue(sasToken.contains("sig=bX6zT1PlwSahNOJAjSARoRyvZ6fHPJGKvAqBdAJx8%2F4%3D"));
   }
 }
