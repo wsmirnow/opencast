@@ -27,7 +27,10 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Map;
 
 public class MicrosoftAzureStorageClientTest {
@@ -102,9 +105,15 @@ public class MicrosoftAzureStorageClientTest {
   }
 
   @Test
-  public void uploadFile() {
+  public void uploadFile()
+      throws MicrosoftAzureStorageClientException, MicrosoftAzureNotAllowedException, IOException, URISyntaxException {
     if (!enabled) {
       return;
     }
+    URL testFileUrl = MicrosoftAzureStorageClientTest.class.getResource("/test.txt");
+    File testFile = new File(testFileUrl.toURI());
+    String blobUrl = azureStorageClient.uploadFile("test-mp1", testFile, "opencast-transcriptions", "test.txt");
+    Assert.assertTrue("Azure storage blob URL should end with /opencast-transcriptions/test.txt",
+        StringUtils.endsWithIgnoreCase(blobUrl, "/opencast-transcriptions/test.txt"));
   }
 }

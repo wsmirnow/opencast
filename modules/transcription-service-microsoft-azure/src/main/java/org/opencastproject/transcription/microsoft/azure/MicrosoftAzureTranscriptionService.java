@@ -267,7 +267,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     }
     //// upload file to azure storage container
     try {
-      String foo = azureStorageClient.uploadFile(mpId, trackFile, azureContainerName, azureBlobPath);
+      azureStorageClient.uploadFile(mpId, trackFile, azureContainerName, azureBlobPath);
     } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureStorageClientException e) {
       throw new TranscriptionServiceException(String.format(
           "Unable to upload track '%s' from media package '%s' to Microsoft Azure storage container '%s'.",

@@ -32,6 +32,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.slf4j.Logger;
@@ -46,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class MicrosoftAzureStorageClient {
@@ -147,32 +149,22 @@ public class MicrosoftAzureStorageClient {
           throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException {
     String containerUrl = String.format("https://%s.%s/%s", azureAuthorization.getAzureStorageAccountName(),
         MicrosoftAzureAuthorization.AZURE_BLOB_STORE_URL_SUFFIX, StringUtils.trimToEmpty(azureContainerName));
+    String blobUrl = containerUrl;
+    if (!StringUtils.startsWith(azureBlobPath, "/")) {
+      blobUrl += "/";
+    }
+    blobUrl += azureBlobPath;
     int blockSize = 100000000; // 100MB
+    String sasToken = azureAuthorization.generateAccountSASToken("w", "o", null, null, null, null);
     try (FileInputStream trackStream = new FileInputStream(trackFile)) {
       try (CloseableHttpClient httpClient = makeHttpClient(CONNECTION_TIMEOUT, SOCKET_TIMEOUT, CONNECTION_TIMEOUT)) {
         List<String> blockIds = new ArrayList<>();
         // put blocks (file chunks)
         for (int iteration = 0; iteration * blockSize < trackFile.length(); iteration++) {
-          String blockPath = azureBlobPath + "." + iteration;
-          if (!StringUtils.startsWith(blockPath, "/")) {
-            blockPath = "/" + blockPath;
-          }
-          String blockId = blockPath.replaceAll("[^a-zA-Z0-9._-]", "_");
-          if (blockId.length() * Character.BYTES > 64) {
-            // cut down to max 64 Bytes
-            blockId = blockId.substring(blockId.length() - (64 / Character.BYTES));
-          }
-          blockId = Base64.encodeBase64String(blockId.getBytes(StandardCharsets.UTF_8));
-          String putBlockUrl = containerUrl + blockPath + "?comp=block&blockid="
-              + URLEncoder.encode(blockId, StandardCharsets.UTF_8);
+          String blockId = Base64.encodeBase64String(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8));
+          String putBlockUrl = blobUrl + "?comp=block&blockid="
+              + URLEncoder.encode(blockId, StandardCharsets.UTF_8) + "&" + sasToken;
           HttpPut httpPut = new HttpPut(putBlockUrl);
-          long blockLength;
-          if ((iteration + 1) * blockSize < trackFile.length()) {
-            blockLength = blockSize;
-          } else {
-            blockLength = trackFile.length() % blockSize;
-          }
-          httpPut.setHeader("Content-Length", Long.toString(blockSize));
           byte[] blockData = trackStream.readNBytes(blockSize);
           httpPut.setEntity(new ByteArrayEntity(blockData, ContentType.APPLICATION_OCTET_STREAM));
           try (CloseableHttpResponse response = httpClient.execute(httpPut)) {
@@ -196,14 +188,40 @@ public class MicrosoftAzureStorageClient {
           }
         }
         // commit block list
-        //String blockList = TODO;
-
+        StringBuffer blockList = new StringBuffer();
+        blockList.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+        blockList.append("<BlockList>");
+        for (String blockId : blockIds) {
+          blockList.append("<Uncommitted>");
+          blockList.append(blockId);
+          blockList.append("</Uncommitted>");
+        }
+        blockList.append("</BlockList>");
+        String putBlockListUrl = blobUrl + "?comp=blocklist&" + sasToken;
+        HttpPut httpPut = new HttpPut(putBlockListUrl);
+        httpPut.setEntity(new StringEntity(blockList.toString(), "application/xml", "UTF-8"));
+        try (CloseableHttpResponse response = httpClient.execute(httpPut)) {
+          int code = response.getStatusLine().getStatusCode();
+          Map<String, String> headersMap = Arrays.stream(response.getAllHeaders())
+              .collect(Collectors.toMap(NameValuePair::getName, NameValuePair::getValue));
+          switch (code) {
+            case HttpStatus.SC_CREATED: // 201
+              break;
+            case HttpStatus.SC_FORBIDDEN: // 403
+              throw new MicrosoftAzureNotAllowedException(String.format(
+                  "Not allowed to put block list to Azure storage container %s. Microsoft error code: %s",
+                  azureContainerName, headersMap.getOrDefault("x-ms-error-code", "UNKNOWN")));
+            default:
+              throw new MicrosoftAzureStorageClientException(String.format(
+                  "Putting block list to Azure storage container %s failed with HTTP response code %d. "
+                      + "Microsoft error code: %s", azureContainerName, code,
+                  headersMap.getOrDefault("x-ms-error-code", "UNKNOWN")));
+          }
+        }
       }
     }
-    return "";
+    return blobUrl;
   }
-
-
 
   protected CloseableHttpClient makeHttpClient(int conectionTimeout, int socketTimeout, int connectionRequestTimeout) {
     RequestConfig reqConfig = RequestConfig.custom().setConnectTimeout(conectionTimeout)
