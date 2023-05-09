@@ -20,39 +20,41 @@
  */
 package org.opencastproject.transcription.microsoft.azure.model;
 
-import com.sun.istack.NotNull;
-
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Dictionary;
 import java.util.List;
+import java.util.Map;
 
 public class MicrosoftAzureSpeechTranscription {
 
   // Documentation:
   // https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_Get
 
+  //CHECKSTYLE:OFF checkstyle:VisibilityModifier
   public class TranscriptionFiles {
     public String files;
-
-    /** Default constructor */
-    public TranscriptionFiles() { }
   }
-  public TranscriptionFiles links;
-  public Dictionary<String, Object> properties;
+  public class TranscriptionSelf {
+    public String self;
+  }
   public String self;
-  public Dictionary<String, Object> model;
-  public Dictionary<String, Object> project;
-  public Dictionary<String, Object> dataset;
+  public TranscriptionSelf model;
+  public TranscriptionFiles links;
+  public Map<String, Object> properties;
+  public TranscriptionSelf project;
+  public TranscriptionSelf dataset;
   public List<String> contentUrls;
   public String contentContainerUrl;
   public String locale;
   public String displayName;
   public String description;
-  public Dictionary<String, Object> customProperties;
+  public Map<String, Object> customProperties;
   public String lastActionDateTime;
   public String status;
   public String createdDateTime;
+
+  //CHECKSTYLE:ON checkstyle:VisibilityModifier
 
   /** Default constructor. */
   public MicrosoftAzureSpeechTranscription() { }

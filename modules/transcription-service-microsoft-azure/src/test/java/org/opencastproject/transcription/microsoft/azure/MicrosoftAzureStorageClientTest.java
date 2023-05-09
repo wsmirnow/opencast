@@ -106,7 +106,8 @@ public class MicrosoftAzureStorageClientTest {
 
   @Test
   public void uploadFile()
-      throws MicrosoftAzureStorageClientException, MicrosoftAzureNotAllowedException, IOException, URISyntaxException {
+          throws MicrosoftAzureStorageClientException, MicrosoftAzureNotAllowedException, IOException,
+          URISyntaxException {
     if (!enabled) {
       return;
     }

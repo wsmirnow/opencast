@@ -26,7 +26,6 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
@@ -34,7 +33,6 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,9 +51,6 @@ import java.util.stream.Collectors;
 public class MicrosoftAzureStorageClient {
 
   private static final Logger logger = LoggerFactory.getLogger(MicrosoftAzureStorageClient.class);
-
-  private static final int CONNECTION_TIMEOUT = 1000 * 60;
-  private static final int SOCKET_TIMEOUT = 1000 * 300;
 
   private MicrosoftAzureAuthorization azureAuthorization;
 
@@ -84,7 +79,7 @@ public class MicrosoftAzureStorageClient {
         null, null, null, null);
     containerUrl = containerUrl + "&" + sasToken;
 
-    try (CloseableHttpClient httpClient = makeHttpClient(CONNECTION_TIMEOUT, SOCKET_TIMEOUT, CONNECTION_TIMEOUT)) {
+    try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
       HttpGet httpGet = new HttpGet(containerUrl);
       try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
         int code = response.getStatusLine().getStatusCode();
@@ -122,7 +117,7 @@ public class MicrosoftAzureStorageClient {
         "restype=container");
     String sasToken = azureAuthorization.generateAccountSASToken("w", "c", null, null, null, null);
     containerUrl = containerUrl + "&" + sasToken;
-    try (CloseableHttpClient httpClient = makeHttpClient(CONNECTION_TIMEOUT, SOCKET_TIMEOUT, CONNECTION_TIMEOUT)) {
+    try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
       HttpPut httpPut = new HttpPut(containerUrl);
       httpPut.addHeader("x-ms-blob-public-access", "blob");
       try (CloseableHttpResponse response = httpClient.execute(httpPut)) {
@@ -157,7 +152,7 @@ public class MicrosoftAzureStorageClient {
     int blockSize = 100000000; // 100MB
     String sasToken = azureAuthorization.generateAccountSASToken("w", "o", null, null, null, null);
     try (FileInputStream trackStream = new FileInputStream(trackFile)) {
-      try (CloseableHttpClient httpClient = makeHttpClient(CONNECTION_TIMEOUT, SOCKET_TIMEOUT, CONNECTION_TIMEOUT)) {
+      try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
         List<String> blockIds = new ArrayList<>();
         // put blocks (file chunks)
         for (int iteration = 0; iteration * blockSize < trackFile.length(); iteration++) {
@@ -221,17 +216,5 @@ public class MicrosoftAzureStorageClient {
       }
     }
     return blobUrl;
-  }
-
-  protected CloseableHttpClient makeHttpClient(int conectionTimeout, int socketTimeout, int connectionRequestTimeout) {
-    RequestConfig reqConfig = RequestConfig.custom().setConnectTimeout(conectionTimeout)
-        .setSocketTimeout(socketTimeout)
-        .setConnectionRequestTimeout(connectionRequestTimeout)
-        .build();
-    CloseableHttpClient httpClient = HttpClientBuilder.create()
-        .useSystemProperties()
-        .setDefaultRequestConfig(reqConfig)
-        .build();
-    return httpClient;
   }
 }
