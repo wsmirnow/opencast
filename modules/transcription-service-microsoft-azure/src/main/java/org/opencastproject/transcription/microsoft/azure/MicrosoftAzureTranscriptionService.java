@@ -77,6 +77,8 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   private static final String KEY_AZURE_ACCOUNT_ACCESS_KEY = "azure_account_access_key";
   private static final String KEY_AZURE_BOLB_PATH = "azure_blob_path";
   private static final String KEY_AZURE_CONTAINER_NAME = "azure_container_name";
+  private static final String KEY_AZURE_SPEECH_SERVICES_ENDPOINT = "azure_speech_services_endpoint";
+  private static final String KEY_COGNITIVE_SERVICES_SUBSCRIPTION_KEY = "azure_cognitive_services_subscription_key";
 
   private AssetManager assetManager;
   private OrganizationDirectoryService organizationDirectoryService;
@@ -94,6 +96,8 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   private String azureAccountAccessKey;
   private String azureBlobPath;
   private String azureContainerName;
+  private String azureSpeechServicesEndpoint;
+  private String azureCognitiveServicesSubscriptionKey;
 
   private enum Operation {
     StartTranscription
@@ -165,6 +169,27 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     } else {
       logger.debug("Azure blob path was not set, using default path.");
       azureBlobPath = DEFAULT_AZURE_BLOB_PATH;
+    }
+
+    Option<String> azureSpeechServicesKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(),
+        KEY_AZURE_SPEECH_SERVICES_ENDPOINT);
+    if (azureSpeechServicesKeyOpt.isSome()) {
+      azureSpeechServicesEndpoint = azureSpeechServicesKeyOpt.get();
+    } else {
+      logger.warn("Azure speech services endpoint was not set. Disabling Microsoft Azure transcription service.");
+      enabled = false;
+      return;
+    }
+
+    Option<String> azureCognitiveServicesSubscriptionKeyKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(),
+        KEY_COGNITIVE_SERVICES_SUBSCRIPTION_KEY);
+    if (azureCognitiveServicesSubscriptionKeyKeyOpt.isSome()) {
+      azureCognitiveServicesSubscriptionKey = azureCognitiveServicesSubscriptionKeyKeyOpt.get();
+    } else {
+      logger.warn("Azure cognitive services subscription key was not set. "
+          + "Disabling Microsoft Azure transcription service.");
+      enabled = false;
+      return;
     }
     logger.info("Activated.");
   }
@@ -266,8 +291,9 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
           "Unable to query or create a storage container '%s' on Microsoft Azure.", azureContainerName), e);
     }
     //// upload file to azure storage container
+    String azureBlobUrl;
     try {
-      azureStorageClient.uploadFile(mpId, trackFile, azureContainerName, azureBlobPath);
+      azureBlobUrl = azureStorageClient.uploadFile(mpId, trackFile, azureContainerName, azureBlobPath);
     } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureStorageClientException e) {
       throw new TranscriptionServiceException(String.format(
           "Unable to upload track '%s' from media package '%s' to Microsoft Azure storage container '%s'.",
