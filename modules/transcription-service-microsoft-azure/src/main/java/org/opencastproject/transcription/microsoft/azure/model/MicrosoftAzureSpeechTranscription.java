@@ -22,6 +22,7 @@ package org.opencastproject.transcription.microsoft.azure.model;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -57,6 +58,22 @@ public class MicrosoftAzureSpeechTranscription {
 
   /** Default constructor. */
   public MicrosoftAzureSpeechTranscription() { }
+
+  public String getID() {
+    if (StringUtils.isEmpty(self)) {
+      return null;
+    }
+    URI selfUriPath = URI.create(URI.create(self).getPath());
+    String speechServiceEndpointPath = "/speechtotext/v3.1/transcriptions/";
+    if (StringUtils.startsWithIgnoreCase(selfUriPath.getPath(), speechServiceEndpointPath)) {
+      String id = StringUtils.substringAfter(selfUriPath.getPath(), speechServiceEndpointPath);
+      if (!StringUtils.contains(id, "/")) {
+        return id;
+      }
+      return StringUtils.substringBefore(id, "/");
+    }
+    return null;
+  }
 
   public boolean isFailed() {
     return StringUtils.equalsIgnoreCase("Failed", status);

@@ -24,7 +24,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.mchange.io.FileUtils;
 
-import org.junit.Assume;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -62,6 +62,31 @@ public class MicrosoftAzureSpeechTranscriptionTest {
         .getResource(testResourcePath).toURI()));
     MicrosoftAzureSpeechTranscription transcription = gson.fromJson(transcriptionStr,
         MicrosoftAzureSpeechTranscription.class);
-    Assume.assumeNotNull(transcription);
+    Assert.assertNotNull(transcription);
+  }
+
+  @Test
+  public void getID() {
+    MicrosoftAzureSpeechTranscription transcription = new MicrosoftAzureSpeechTranscription();
+    transcription.self = "https://transcription.cognitiveservices.azure.com"
+        + "/speechtotext/v3.1/transcriptions/2b58923c-d0d5-4e77-9f9a-74bf80f173df";
+    String transcriptionId = transcription.getID();
+    Assert.assertEquals("2b58923c-d0d5-4e77-9f9a-74bf80f173df", transcriptionId);
+    transcription.self = "https://transcription.cognitiveservices.azure.com"
+        + "/speechtotext/v3.1/transcriptions/2b58923c-d0d5-4e77-9f9a-74bf80f173df/";
+    transcriptionId = transcription.getID();
+    Assert.assertEquals("2b58923c-d0d5-4e77-9f9a-74bf80f173df", transcriptionId);
+    transcription.self = "https://transcription.cognitiveservices.azure.com"
+        + "/speechtotext/v3.1/transcriptions/2b58923c-d0d5-4e77-9f9a-74bf80f173df/foo";
+    transcriptionId = transcription.getID();
+    Assert.assertEquals("2b58923c-d0d5-4e77-9f9a-74bf80f173df", transcriptionId);
+    transcription.self = "https://transcription.cognitiveservices.azure.com"
+        + "/speechtotext/v3.1/transcriptions/2b58923c-d0d5-4e77-9f9a-74bf80f173df?foo";
+    transcriptionId = transcription.getID();
+    Assert.assertEquals("2b58923c-d0d5-4e77-9f9a-74bf80f173df", transcriptionId);
+    transcription.self = "https://transcription.cognitiveservices.azure.com"
+        + "/foo/speechtotext/v3.1/transcriptions/2b58923c-d0d5-4e77-9f9a-74bf80f173df";
+    transcriptionId = transcription.getID();
+    Assert.assertNull(transcriptionId);
   }
 }

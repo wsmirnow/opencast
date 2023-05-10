@@ -24,7 +24,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.mchange.io.FileUtils;
 
-import org.junit.Assume;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -62,6 +62,6 @@ public class MicrosoftAzureSpeechTranscriptionsTest {
         .getResource(testResourcePath).toURI()));
     MicrosoftAzureSpeechTranscriptions transcriptions = gson.fromJson(transcriptionStr,
         MicrosoftAzureSpeechTranscriptions.class);
-    Assume.assumeNotNull(transcriptions);
+    Assert.assertNotNull(transcriptions);
   }
 }

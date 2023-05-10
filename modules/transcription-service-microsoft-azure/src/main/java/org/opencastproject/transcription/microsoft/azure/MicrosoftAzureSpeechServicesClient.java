@@ -32,6 +32,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
@@ -40,7 +43,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MicrosoftAzureSpeechServicesClient {
 
@@ -48,6 +53,7 @@ public class MicrosoftAzureSpeechServicesClient {
 
   private final String azureSpeechServicesEndpoint;
   private final String azureCognitiveServicesSubscriptionKey;
+  private String DEFAULT_TRANSCRIPTION_TIME_TO_LIVE = "P7D";
 
   public MicrosoftAzureSpeechServicesClient(@NotNull String azureSpeechServicesEndpoint,
       @NotNull String azureCognitiveServicesSubscriptionKey) {
@@ -63,6 +69,8 @@ public class MicrosoftAzureSpeechServicesClient {
 
   public List<MicrosoftAzureSpeechTranscription> getTranscriptions(int skip, int top, String filter)
           throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
+    // Documentation:
+    // https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_List
     StringBuilder url = new StringBuilder(azureSpeechServicesEndpoint + "/speechtotext/v3.1/transcriptions");
     StringBuilder params = new StringBuilder();
     if (skip > 0) {
@@ -108,13 +116,21 @@ public class MicrosoftAzureSpeechServicesClient {
     }
   }
 
-  public MicrosoftAzureSpeechTranscription getTranscription(@NotNull String transcriptionId)
-          throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
-    if (StringUtils.isBlank(transcriptionId)) {
-      throw new IllegalArgumentException("Transcription ID not set.");
-    }
-    String url = azureSpeechServicesEndpoint + "/speechtotext/v3.1/transcriptions/"
+  public MicrosoftAzureSpeechTranscription getTranscriptionById(@NotNull String transcriptionId)
+      throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
+    String transcriptionUrl = azureSpeechServicesEndpoint + "/speechtotext/v3.1/transcriptions/"
         + StringUtils.trimToEmpty(transcriptionId);
+    return getTranscription(transcriptionUrl);
+  }
+
+  public MicrosoftAzureSpeechTranscription getTranscription(@NotNull String transcriptionUrl)
+          throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
+    if (StringUtils.isBlank(transcriptionUrl)) {
+      throw new IllegalArgumentException("Transcription URL not set.");
+    }
+    // Documentation:
+    // https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_Get
+    String url = StringUtils.trimToEmpty(transcriptionUrl);
     try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
       HttpGet httpGet = new HttpGet(url);
       httpGet.addHeader("Ocp-Apim-Subscription-Key", azureCognitiveServicesSubscriptionKey);
@@ -128,14 +144,74 @@ public class MicrosoftAzureSpeechServicesClient {
             break;
           case HttpStatus.SC_FORBIDDEN: // 403
             errorResponse = gson.fromJson(responseString, MicrosoftAzureSpeechServicesErrorResponse.class);
-            throw new MicrosoftAzureNotAllowedException(String.format("Not allowed to get transcription with ID '%s'. "
-                    + "Microsoft Azure Speech Services error code %d: %s", transcriptionId, errorResponse.error.code,
+            throw new MicrosoftAzureNotAllowedException(String.format("Not allowed to get transcription '%s'. "
+                    + "Microsoft Azure Speech Services error code %d: %s", transcriptionUrl, errorResponse.error.code,
                 errorResponse.error.message));
           default:
             errorResponse = gson.fromJson(responseString, MicrosoftAzureSpeechServicesErrorResponse.class);
             throw new MicrosoftAzureSpeechClientException(String.format(
-                "Getting transcription with ID '%s' failed with HTTP response code %d. "
-                    + "Microsoft Azure Speech Services error code %d: %s", transcriptionId, code,
+                "Getting transcription '%s' failed with HTTP response code %d. "
+                    + "Microsoft Azure Speech Services error code %d: %s", transcriptionUrl, code,
+                errorResponse.error.code, errorResponse.error.message));
+        }
+        return gson.fromJson(responseString, MicrosoftAzureSpeechTranscription.class);
+      }
+    }
+  }
+
+  public MicrosoftAzureSpeechTranscription createTranscription(@NotNull List<String> contentUrls,
+      String destinationContainerUrl, @NotNull String displayName , @NotNull String locale,
+      List<String> candidateLocales, String timeToLive, Map<String, Object> properties)
+      throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
+    // Documentation:
+    // https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_Create
+    // https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/batch-transcription-create?pivots=rest-api
+    String url = azureSpeechServicesEndpoint  + "/speechtotext/v3.1/transcriptions";
+    MicrosoftAzureSpeechTranscription requestTranscription = new MicrosoftAzureSpeechTranscription();
+    // required properties
+    requestTranscription.displayName = displayName;
+    requestTranscription.locale = locale;
+    requestTranscription.contentUrls = contentUrls;
+    // optional properties
+    requestTranscription.properties = new HashMap<>();
+    if (!properties.isEmpty()) {
+      requestTranscription.properties.putAll(properties);
+    }
+    if (StringUtils.isNotEmpty(destinationContainerUrl)) {
+      requestTranscription.properties.put("destinationContainerUrl", destinationContainerUrl);
+    }
+    if (!candidateLocales.isEmpty()) {
+      Map<String, Object> languageIdentification = new HashMap<>();
+      languageIdentification.put("candidateLocales", candidateLocales);
+      requestTranscription.properties.put("languageIdentification",languageIdentification);
+    }
+    if (StringUtils.isNotEmpty(timeToLive)) {
+      requestTranscription.properties.put("timeToLive", timeToLive);
+    } else {
+      requestTranscription.properties.put("timeToLive", DEFAULT_TRANSCRIPTION_TIME_TO_LIVE);
+    }
+    Gson gson = new GsonBuilder().create();
+    try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
+      HttpPut httpPut = new HttpPut(url);
+      httpPut.addHeader("Ocp-Apim-Subscription-Key", azureCognitiveServicesSubscriptionKey);
+      httpPut.setEntity(new StringEntity(gson.toJson(requestTranscription), ContentType.APPLICATION_JSON));
+      try (CloseableHttpResponse response = httpClient.execute(httpPut)) {
+        int code = response.getStatusLine().getStatusCode();
+        String responseString = EntityUtils.toString(response.getEntity());
+        MicrosoftAzureSpeechServicesErrorResponse errorResponse;
+        switch (code) {
+          case HttpStatus.SC_OK: // 200
+            break;
+          case HttpStatus.SC_FORBIDDEN: // 403
+            errorResponse = gson.fromJson(responseString, MicrosoftAzureSpeechServicesErrorResponse.class);
+            throw new MicrosoftAzureNotAllowedException(String.format(
+                "Not allowed to create transcription '%s'. Microsoft Azure Speech Services error code %d: %s",
+                displayName, errorResponse.error.code, errorResponse.error.message));
+          default:
+            errorResponse = gson.fromJson(responseString, MicrosoftAzureSpeechServicesErrorResponse.class);
+            throw new MicrosoftAzureSpeechClientException(String.format(
+                "Creating transcription '%s' failed with HTTP response code %d. "
+                    + "Microsoft Azure Speech Services error code %d: %s", displayName, code,
                 errorResponse.error.code, errorResponse.error.message));
         }
         return gson.fromJson(responseString, MicrosoftAzureSpeechTranscription.class);

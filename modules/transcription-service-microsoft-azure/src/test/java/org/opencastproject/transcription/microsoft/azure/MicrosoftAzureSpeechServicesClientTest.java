@@ -69,7 +69,7 @@ public class MicrosoftAzureSpeechServicesClientTest {
       return;
     }
     String transcriptionId = "09c3892c-4819-46b3-9161-9716679bdf01";
-    MicrosoftAzureSpeechTranscription transcription = azureSpeechClient.getTranscription(
+    MicrosoftAzureSpeechTranscription transcription = azureSpeechClient.getTranscriptionById(
         transcriptionId);
     Assert.assertNotNull(transcription);
     Assert.assertTrue(transcription.self.contains(transcriptionId));

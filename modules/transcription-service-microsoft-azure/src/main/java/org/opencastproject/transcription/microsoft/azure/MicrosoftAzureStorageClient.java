@@ -194,7 +194,9 @@ public class MicrosoftAzureStorageClient {
         blockList.append("</BlockList>");
         String putBlockListUrl = blobUrl + "?comp=blocklist&" + sasToken;
         HttpPut httpPut = new HttpPut(putBlockListUrl);
-        httpPut.setEntity(new StringEntity(blockList.toString(), "application/xml", "UTF-8"));
+        //httpPut.setEntity(new StringEntity(blockList.toString(), ContentType.APPLICATION_XML));
+        httpPut.setEntity(new StringEntity(blockList.toString(),
+            ContentType.create("application/xml", StandardCharsets.UTF_8)));
         try (CloseableHttpResponse response = httpClient.execute(httpPut)) {
           int code = response.getStatusLine().getStatusCode();
           Map<String, String> headersMap = Arrays.stream(response.getAllHeaders())
