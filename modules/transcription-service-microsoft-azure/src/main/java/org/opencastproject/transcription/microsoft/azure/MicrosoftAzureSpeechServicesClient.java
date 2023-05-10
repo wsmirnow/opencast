@@ -26,7 +26,6 @@ import org.opencastproject.transcription.microsoft.azure.model.MicrosoftAzureSpe
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.sun.istack.NotNull;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
@@ -50,14 +49,12 @@ import java.util.Map;
 public class MicrosoftAzureSpeechServicesClient {
 
   private static final Logger logger = LoggerFactory.getLogger(MicrosoftAzureSpeechServicesClient.class);
-
+  private static final String DEFAULT_TRANSCRIPTION_TIME_TO_LIVE = "P7D";
   private final String azureSpeechServicesEndpoint;
   private final String azureCognitiveServicesSubscriptionKey;
-  private String DEFAULT_TRANSCRIPTION_TIME_TO_LIVE = "P7D";
 
-  public MicrosoftAzureSpeechServicesClient(@NotNull String azureSpeechServicesEndpoint,
-      @NotNull String azureCognitiveServicesSubscriptionKey) {
-
+  public MicrosoftAzureSpeechServicesClient(String azureSpeechServicesEndpoint,
+      String azureCognitiveServicesSubscriptionKey) {
     this.azureSpeechServicesEndpoint = StringUtils.trimToEmpty(azureSpeechServicesEndpoint);
     this.azureCognitiveServicesSubscriptionKey = StringUtils.trimToEmpty(azureCognitiveServicesSubscriptionKey);
   }
@@ -116,14 +113,14 @@ public class MicrosoftAzureSpeechServicesClient {
     }
   }
 
-  public MicrosoftAzureSpeechTranscription getTranscriptionById(@NotNull String transcriptionId)
-      throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
+  public MicrosoftAzureSpeechTranscription getTranscriptionById(String transcriptionId)
+          throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
     String transcriptionUrl = azureSpeechServicesEndpoint + "/speechtotext/v3.1/transcriptions/"
         + StringUtils.trimToEmpty(transcriptionId);
     return getTranscription(transcriptionUrl);
   }
 
-  public MicrosoftAzureSpeechTranscription getTranscription(@NotNull String transcriptionUrl)
+  public MicrosoftAzureSpeechTranscription getTranscription(String transcriptionUrl)
           throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
     if (StringUtils.isBlank(transcriptionUrl)) {
       throw new IllegalArgumentException("Transcription URL not set.");
@@ -159,13 +156,15 @@ public class MicrosoftAzureSpeechServicesClient {
     }
   }
 
-  public MicrosoftAzureSpeechTranscription createTranscription(@NotNull List<String> contentUrls,
-      String destinationContainerUrl, @NotNull String displayName , @NotNull String locale,
-      List<String> candidateLocales, String timeToLive, Map<String, Object> properties)
-      throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
+  public MicrosoftAzureSpeechTranscription createTranscription(List<String> contentUrls, String destinationContainerUrl,
+      String displayName , String locale, List<String> candidateLocales, String timeToLive,
+      Map<String, Object> properties)
+          throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
+    // CHECKSTYLE:OFF checkstyle:LineLength
     // Documentation:
     // https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_Create
     // https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/batch-transcription-create?pivots=rest-api
+    // CHECKSTYLE:ON checkstyle:LineLength
     String url = azureSpeechServicesEndpoint  + "/speechtotext/v3.1/transcriptions";
     MicrosoftAzureSpeechTranscription requestTranscription = new MicrosoftAzureSpeechTranscription();
     // required properties

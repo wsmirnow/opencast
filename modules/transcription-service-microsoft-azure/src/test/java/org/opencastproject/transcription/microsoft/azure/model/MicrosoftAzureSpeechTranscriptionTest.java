@@ -22,8 +22,8 @@ package org.opencastproject.transcription.microsoft.azure.model;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.mchange.io.FileUtils;
 
+import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,6 +33,7 @@ import org.junit.runners.Parameterized;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 
@@ -58,8 +59,8 @@ public class MicrosoftAzureSpeechTranscriptionTest {
 
   @Test
   public void deserialize() throws URISyntaxException, IOException {
-    String transcriptionStr = FileUtils.getContentsAsString(new File(MicrosoftAzureSpeechTranscriptionTest.class
-        .getResource(testResourcePath).toURI()));
+    String transcriptionStr = FileUtils.readFileToString(new File(MicrosoftAzureSpeechTranscriptionTest.class
+        .getResource(testResourcePath).toURI()), StandardCharsets.UTF_8);
     MicrosoftAzureSpeechTranscription transcription = gson.fromJson(transcriptionStr,
         MicrosoftAzureSpeechTranscription.class);
     Assert.assertNotNull(transcription);

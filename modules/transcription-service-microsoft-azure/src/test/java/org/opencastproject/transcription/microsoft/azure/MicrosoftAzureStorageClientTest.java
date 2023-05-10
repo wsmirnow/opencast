@@ -78,7 +78,7 @@ public class MicrosoftAzureStorageClientTest {
     if (!enabled) {
       return;
     }
-    boolean containerExists = azureStorageClient.containerExists("mp1", "opencast-transcriptions");
+    boolean containerExists = azureStorageClient.containerExists("opencast-transcriptions");
     Assert.assertTrue(containerExists);
   }
 
@@ -89,7 +89,7 @@ public class MicrosoftAzureStorageClientTest {
     if (!enabled) {
       return;
     }
-    Map<String, String> containerProps = azureStorageClient.getContainerProperties("mp1", "opencast-transcriptions");
+    Map<String, String> containerProps = azureStorageClient.getContainerProperties("opencast-transcriptions");
     Assert.assertNotNull(containerProps);
     Assert.assertFalse(containerProps.isEmpty());
     logger.info("Container properties: {}", containerProps);
@@ -101,7 +101,7 @@ public class MicrosoftAzureStorageClientTest {
     if (!enabled) {
       return;
     }
-    azureStorageClient.createContainer("mp1", "opencast-transcriptions2");
+    azureStorageClient.createContainer("opencast-transcriptions2");
   }
 
   @Test
@@ -113,7 +113,7 @@ public class MicrosoftAzureStorageClientTest {
     }
     URL testFileUrl = MicrosoftAzureStorageClientTest.class.getResource("/test.txt");
     File testFile = new File(testFileUrl.toURI());
-    String blobUrl = azureStorageClient.uploadFile("test-mp1", testFile, "opencast-transcriptions", "test.txt");
+    String blobUrl = azureStorageClient.uploadFile(testFile, "opencast-transcriptions", null, "test.txt");
     Assert.assertTrue("Azure storage blob URL should end with /opencast-transcriptions/test.txt",
         StringUtils.endsWithIgnoreCase(blobUrl, "/opencast-transcriptions/test.txt"));
   }

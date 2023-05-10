@@ -34,6 +34,7 @@ import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.transcription.api.TranscriptionService;
 import org.opencastproject.transcription.api.TranscriptionServiceException;
+import org.opencastproject.transcription.microsoft.azure.model.MicrosoftAzureSpeechTranscription;
 import org.opencastproject.transcription.persistence.TranscriptionDatabase;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.OsgiUtil;
@@ -42,6 +43,7 @@ import org.opencastproject.workflow.api.WorkflowService;
 import org.opencastproject.workingfilerepository.api.WorkingFileRepository;
 import org.opencastproject.workspace.api.Workspace;
 
+import org.apache.commons.io.FilenameUtils;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -207,10 +209,11 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     op = Operation.valueOf(operation);
     switch (op) {
       case StartTranscription:
+        long jobId = job.getId();
         String mpId = arguments.get(0);
         Track track = (Track) MediaPackageElementParser.getFromXml(arguments.get(1));
         String languageCode = arguments.get(2);
-        return createTranscriptionJob(mpId, track, languageCode);
+        return createTranscriptionJob(jobId, mpId, track, languageCode);
       default:
         throw new IllegalStateException("Don't know how to handle operation '" + operation + "'");
     }
@@ -263,7 +266,8 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     return null;
   }
 
-  public String createTranscriptionJob(String mpId, Track track, String language) throws TranscriptionServiceException {
+  public String createTranscriptionJob(long jobId, String mpId, Track track, String language)
+          throws TranscriptionServiceException {
     // load media file into workspace
     File trackFile;
     try {
@@ -276,16 +280,17 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     }
     // upload media file to azure storage
     //// create Azure storage client
+    MicrosoftAzureAuthorization azureAuthorization;
     MicrosoftAzureStorageClient azureStorageClient;
     try {
-      azureStorageClient = new MicrosoftAzureStorageClient(new MicrosoftAzureAuthorization(azureStorageAccountName,
-          azureAccountAccessKey));
+      azureAuthorization = new MicrosoftAzureAuthorization(azureStorageAccountName, azureAccountAccessKey);
+      azureStorageClient = new MicrosoftAzureStorageClient(azureAuthorization);
     } catch (MicrosoftAzureStorageClientException e) {
       throw new TranscriptionServiceException("Unable to create Microsoft Azure storage client.", e);
     }
     //// assure azure storage container exists
     try {
-      azureStorageClient.createContainer(mpId, azureContainerName);
+      azureStorageClient.createContainer(azureContainerName);
     } catch (IOException | MicrosoftAzureStorageClientException | MicrosoftAzureNotAllowedException e) {
       throw new TranscriptionServiceException(String.format(
           "Unable to query or create a storage container '%s' on Microsoft Azure.", azureContainerName), e);
@@ -293,16 +298,37 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     //// upload file to azure storage container
     String azureBlobUrl;
     try {
-      azureBlobUrl = azureStorageClient.uploadFile(mpId, trackFile, azureContainerName, azureBlobPath);
+      azureBlobUrl = azureStorageClient.uploadFile(trackFile, azureContainerName,
+          azureBlobPath, jobId + "." + FilenameUtils.getExtension(trackFile.getName()));
     } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureStorageClientException e) {
       throw new TranscriptionServiceException(String.format(
-          "Unable to upload track '%s' from media package '%s' to Microsoft Azure storage container '%s'.",
+          "Unable to upload track %s from media package '%s' to Microsoft Azure storage container '%s'.",
           track.getURI(), mpId, azureContainerName), e);
     }
     // start azure transcription job
+    List<String> contentUrls = Arrays.asList(String.format("%s?%s", azureBlobUrl,
+        azureAuthorization.generateAccountSASToken("r", "b", null, null, null, null)));
+    String azureDestContainerUrl = String.format("%s?%s", azureStorageClient.getContainerUrl(azureContainerName),
+        azureAuthorization.generateAccountSASToken("rwl", "b", null, null, null, null));
+    // create Azure Speech Services client
+    MicrosoftAzureSpeechServicesClient azureSpeechServicesClient = new MicrosoftAzureSpeechServicesClient(
+        azureSpeechServicesEndpoint, azureCognitiveServicesSubscriptionKey);
+    MicrosoftAzureSpeechTranscription transcription;
+    try {
+      transcription = azureSpeechServicesClient.createTranscription(contentUrls,
+          azureDestContainerUrl, String.format("Transcription job %d", jobId), language, null, null, null);
+      logger.info("Started transcription of {} from media package '{}' on Microsoft Azure Speech Services at {}",
+          track.getURI(), mpId, transcription.self);
+    } catch (MicrosoftAzureNotAllowedException | IOException | MicrosoftAzureSpeechClientException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Unable to create transcription of track %s from media package '%s' "
+              + "in Microsoft Azure storage container '%s'.",
+          track.getURI(), mpId, azureContainerName), e);
+    }
     // store transcription job ID and status
+
     // return transcription job ID
-    return "";
+    return transcription.self;
   }
 
   @Override

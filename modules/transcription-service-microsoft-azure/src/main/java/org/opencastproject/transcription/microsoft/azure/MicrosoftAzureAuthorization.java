@@ -20,8 +20,6 @@
  */
 package org.opencastproject.transcription.microsoft.azure;
 
-import com.sun.istack.NotNull;
-
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.HmacAlgorithms;
 import org.apache.commons.codec.digest.HmacUtils;
@@ -68,7 +66,7 @@ public class MicrosoftAzureAuthorization {
     return azureStorageAccountName;
   }
 
-  String generateAccountSASToken(@NotNull String signedPermissions, @NotNull String signedResourceType,
+  String generateAccountSASToken(String signedPermissions, String signedResourceType,
       Date signedStart, Date signedExpiry, String signedIP, String signedEncryptionScope) {
     // documentation: https://learn.microsoft.com/en-us/rest/api/storageservices/create-account-sas
     SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");

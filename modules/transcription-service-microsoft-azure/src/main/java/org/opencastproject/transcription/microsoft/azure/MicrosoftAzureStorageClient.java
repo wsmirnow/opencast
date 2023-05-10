@@ -20,8 +20,6 @@
  */
 package org.opencastproject.transcription.microsoft.azure;
 
-import com.sun.istack.NotNull;
-
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
@@ -41,6 +39,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -54,14 +53,20 @@ public class MicrosoftAzureStorageClient {
 
   private MicrosoftAzureAuthorization azureAuthorization;
 
-  public MicrosoftAzureStorageClient(@NotNull MicrosoftAzureAuthorization azureAuthorization) {
+  public MicrosoftAzureStorageClient(MicrosoftAzureAuthorization azureAuthorization) {
     this.azureAuthorization = azureAuthorization;
   }
 
-  public boolean containerExists(String mpId, String azureContainerName)
+  public String getContainerUrl(String azureContainerName) {
+    return String.format("https://%s.%s/%s", azureAuthorization.getAzureStorageAccountName(),
+        MicrosoftAzureAuthorization.AZURE_BLOB_STORE_URL_SUFFIX,
+        StringUtils.trimToEmpty(azureContainerName));
+  }
+
+  public boolean containerExists(String azureContainerName)
           throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException {
     try {
-      Map<String, String> containerProperties = getContainerProperties(mpId, azureContainerName);
+      Map<String, String> containerProperties = getContainerProperties(azureContainerName);
       return containerProperties.containsKey("x-ms-blob-public-access") && StringUtils.equalsIgnoreCase("unlocked",
           containerProperties.getOrDefault("x-ms-lease-status", "INVALID"));
     } catch (MicrosoftAzureNotFoundException ex) {
@@ -69,12 +74,10 @@ public class MicrosoftAzureStorageClient {
     }
   }
 
-  public Map<String, String> getContainerProperties(String mpId, String azureContainerName)
+  public Map<String, String> getContainerProperties(String azureContainerName)
           throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException,
           MicrosoftAzureNotFoundException {
-    String containerUrl = String.format("https://%s.%s/%s?%s", azureAuthorization.getAzureStorageAccountName(),
-        MicrosoftAzureAuthorization.AZURE_BLOB_STORE_URL_SUFFIX,
-        StringUtils.trimToEmpty(azureContainerName), "restype=container");
+    String containerUrl = String.format("%s?%s", getContainerUrl(azureContainerName), "restype=container");
     String sasToken = azureAuthorization.generateAccountSASToken("r", "c",
         null, null, null, null);
     containerUrl = containerUrl + "&" + sasToken;
@@ -107,14 +110,12 @@ public class MicrosoftAzureStorageClient {
     }
   }
 
-  public void createContainer(String mpId, String azureContainerName)
+  public void createContainer(String azureContainerName)
           throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException {
-    if (containerExists(mpId, azureContainerName)) {
+    if (containerExists(azureContainerName)) {
       return;
     }
-    String containerUrl = String.format("https://%s.%s/%s?%s", azureAuthorization.getAzureStorageAccountName(),
-        MicrosoftAzureAuthorization.AZURE_BLOB_STORE_URL_SUFFIX, StringUtils.trimToEmpty(azureContainerName),
-        "restype=container");
+    String containerUrl = String.format("%s?%s", getContainerUrl(azureContainerName), "restype=container");
     String sasToken = azureAuthorization.generateAccountSASToken("w", "c", null, null, null, null);
     containerUrl = containerUrl + "&" + sasToken;
     try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
@@ -140,15 +141,11 @@ public class MicrosoftAzureStorageClient {
     }
   }
 
-  public String uploadFile(String mpId, File trackFile, String azureContainerName, String azureBlobPath)
+  public String uploadFile(File trackFile, String azureContainerName, String azureBlobPath, String azureBlobName)
           throws MicrosoftAzureStorageClientException, IOException, MicrosoftAzureNotAllowedException {
-    String containerUrl = String.format("https://%s.%s/%s", azureAuthorization.getAzureStorageAccountName(),
-        MicrosoftAzureAuthorization.AZURE_BLOB_STORE_URL_SUFFIX, StringUtils.trimToEmpty(azureContainerName));
-    String blobUrl = containerUrl;
-    if (!StringUtils.startsWith(azureBlobPath, "/")) {
-      blobUrl += "/";
-    }
-    blobUrl += azureBlobPath;
+    String containerUrl = getContainerUrl(azureContainerName);
+    String blobUrl = String.format("%s/%s",containerUrl, Paths.get(
+        StringUtils.trimToEmpty(azureBlobPath), StringUtils.trimToEmpty(azureBlobName)).normalize());
     int blockSize = 100000000; // 100MB
     String sasToken = azureAuthorization.generateAccountSASToken("w", "o", null, null, null, null);
     try (FileInputStream trackStream = new FileInputStream(trackFile)) {
