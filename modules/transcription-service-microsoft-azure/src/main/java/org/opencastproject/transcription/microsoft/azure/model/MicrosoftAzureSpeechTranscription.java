@@ -22,7 +22,6 @@ package org.opencastproject.transcription.microsoft.azure.model;
 
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
 

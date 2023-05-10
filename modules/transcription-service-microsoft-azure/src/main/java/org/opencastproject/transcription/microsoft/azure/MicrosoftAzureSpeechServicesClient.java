@@ -30,7 +30,6 @@ import com.sun.istack.NotNull;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
-import org.apache.http.NameValuePair;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -41,10 +40,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 public class MicrosoftAzureSpeechServicesClient {
 
@@ -112,7 +108,38 @@ public class MicrosoftAzureSpeechServicesClient {
     }
   }
 
-  public MicrosoftAzureSpeechTranscription getTranscription(@NotNull String transcriptionId) {
-    return null;
+  public MicrosoftAzureSpeechTranscription getTranscription(@NotNull String transcriptionId)
+          throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
+    if (StringUtils.isBlank(transcriptionId)) {
+      throw new IllegalArgumentException("Transcription ID not set.");
+    }
+    String url = azureSpeechServicesEndpoint + "/speechtotext/v3.1/transcriptions/"
+        + StringUtils.trimToEmpty(transcriptionId);
+    try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
+      HttpGet httpGet = new HttpGet(url);
+      httpGet.addHeader("Ocp-Apim-Subscription-Key", azureCognitiveServicesSubscriptionKey);
+      try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+        int code = response.getStatusLine().getStatusCode();
+        String responseString = EntityUtils.toString(response.getEntity());
+        Gson gson = new GsonBuilder().create();
+        MicrosoftAzureSpeechServicesErrorResponse errorResponse;
+        switch (code) {
+          case HttpStatus.SC_OK: // 200
+            break;
+          case HttpStatus.SC_FORBIDDEN: // 403
+            errorResponse = gson.fromJson(responseString, MicrosoftAzureSpeechServicesErrorResponse.class);
+            throw new MicrosoftAzureNotAllowedException(String.format("Not allowed to get transcription with ID '%s'. "
+                    + "Microsoft Azure Speech Services error code %d: %s", transcriptionId, errorResponse.error.code,
+                errorResponse.error.message));
+          default:
+            errorResponse = gson.fromJson(responseString, MicrosoftAzureSpeechServicesErrorResponse.class);
+            throw new MicrosoftAzureSpeechClientException(String.format(
+                "Getting transcription with ID '%s' failed with HTTP response code %d. "
+                    + "Microsoft Azure Speech Services error code %d: %s", transcriptionId, code,
+                errorResponse.error.code, errorResponse.error.message));
+        }
+        return gson.fromJson(responseString, MicrosoftAzureSpeechTranscription.class);
+      }
+    }
   }
 }

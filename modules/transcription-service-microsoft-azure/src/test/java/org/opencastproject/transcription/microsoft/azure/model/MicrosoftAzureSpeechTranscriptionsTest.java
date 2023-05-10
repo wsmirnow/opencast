@@ -37,12 +37,12 @@ import java.util.Arrays;
 import java.util.List;
 
 @RunWith(Parameterized.class)
-public class MicrosoftAzureSpeechTranscriptionTest {
+public class MicrosoftAzureSpeechTranscriptionsTest {
 
   private final String testResourcePath;
   private Gson gson;
 
-  public MicrosoftAzureSpeechTranscriptionTest(String testResourcePath) {
+  public MicrosoftAzureSpeechTranscriptionsTest(String testResourcePath) {
     this.testResourcePath = testResourcePath;
   }
 
@@ -53,15 +53,15 @@ public class MicrosoftAzureSpeechTranscriptionTest {
 
   @Parameterized.Parameters()
   public static List<String> data() {
-    return Arrays.asList("/transcription1.json", "/transcription2.json", "/transcription3.json");
+    return Arrays.asList("/transcriptions.json");
   }
 
   @Test
   public void deserialize() throws URISyntaxException, IOException {
-    String transcriptionStr = FileUtils.getContentsAsString(new File(MicrosoftAzureSpeechTranscriptionTest.class
+    String transcriptionStr = FileUtils.getContentsAsString(new File(MicrosoftAzureSpeechTranscriptionsTest.class
         .getResource(testResourcePath).toURI()));
-    MicrosoftAzureSpeechTranscription transcription = gson.fromJson(transcriptionStr,
-        MicrosoftAzureSpeechTranscription.class);
-    Assume.assumeNotNull(transcription);
+    MicrosoftAzureSpeechTranscriptions transcriptions = gson.fromJson(transcriptionStr,
+        MicrosoftAzureSpeechTranscriptions.class);
+    Assume.assumeNotNull(transcriptions);
   }
 }

@@ -20,10 +20,6 @@
  */
 package org.opencastproject.transcription.microsoft.azure.model;
 
-import com.google.gson.annotations.SerializedName;
-
-import java.util.List;
-
 public class MicrosoftAzureSpeechServicesErrorResponse {
 
   // Documentation:

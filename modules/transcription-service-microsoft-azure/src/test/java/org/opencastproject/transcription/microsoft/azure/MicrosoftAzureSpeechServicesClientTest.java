@@ -63,6 +63,15 @@ public class MicrosoftAzureSpeechServicesClientTest {
   }
 
   @Test
-  public void getTranscription() {
+  public void getTranscription()
+          throws MicrosoftAzureNotAllowedException, IOException, MicrosoftAzureSpeechClientException {
+    if (!enabled) {
+      return;
+    }
+    String transcriptionId = "09c3892c-4819-46b3-9161-9716679bdf01";
+    MicrosoftAzureSpeechTranscription transcription = azureSpeechClient.getTranscription(
+        transcriptionId);
+    Assert.assertNotNull(transcription);
+    Assert.assertTrue(transcription.self.contains(transcriptionId));
   }
 }
