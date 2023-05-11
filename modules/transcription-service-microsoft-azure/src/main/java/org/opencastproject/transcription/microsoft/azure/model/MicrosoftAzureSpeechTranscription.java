@@ -31,7 +31,7 @@ public class MicrosoftAzureSpeechTranscription {
   // Documentation:
   // https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_Get
 
-  //CHECKSTYLE:OFF checkstyle:VisibilityModifier
+  // CHECKSTYLE:OFF checkstyle:VisibilityModifier
   public class TranscriptionFiles {
     public String files;
   }
@@ -54,7 +54,7 @@ public class MicrosoftAzureSpeechTranscription {
   public String status;
   public String createdDateTime;
 
-  //CHECKSTYLE:ON checkstyle:VisibilityModifier
+  // CHECKSTYLE:ON checkstyle:VisibilityModifier
 
   /** Default constructor. */
   public MicrosoftAzureSpeechTranscription() { }

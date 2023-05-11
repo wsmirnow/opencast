@@ -24,6 +24,8 @@ import org.opencastproject.assetmanager.api.AssetManager;
 import org.opencastproject.job.api.AbstractJobProducer;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.mediapackage.MediaPackageElement;
+import org.opencastproject.mediapackage.MediaPackageElementBuilderFactory;
+import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.Track;
@@ -35,7 +37,11 @@ import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.transcription.api.TranscriptionService;
 import org.opencastproject.transcription.api.TranscriptionServiceException;
 import org.opencastproject.transcription.microsoft.azure.model.MicrosoftAzureSpeechTranscription;
+import org.opencastproject.transcription.microsoft.azure.model.MicrosoftAzureSpeechTranscriptionFile;
+import org.opencastproject.transcription.microsoft.azure.model.MicrosoftAzureSpeechTranscriptionFiles;
 import org.opencastproject.transcription.persistence.TranscriptionDatabase;
+import org.opencastproject.transcription.persistence.TranscriptionDatabaseException;
+import org.opencastproject.transcription.persistence.TranscriptionJobControl;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.OsgiUtil;
 import org.opencastproject.util.data.Option;
@@ -44,6 +50,8 @@ import org.opencastproject.workingfilerepository.api.WorkingFileRepository;
 import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -55,9 +63,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -73,6 +83,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   private static final String DEFAULT_LANGUAGE = "en-GB";
   private static final String DEFAULT_AZURE_BLOB_PATH = "";
   private static final String DEFAULT_AZURE_CONTAINER_NAME = "opencast-transcriptions";
+  private static final float DEFAULT_MIN_CONFIDENCE = 0.7f;
   private static final String KEY_ENABLED = "enabled";
   private static final String KEY_LANGUAGE = "language";
   private static final String KEY_AZURE_STORAGE_ACCOUNT_NAME = "azure_storage_account_name";
@@ -81,6 +92,8 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   private static final String KEY_AZURE_CONTAINER_NAME = "azure_container_name";
   private static final String KEY_AZURE_SPEECH_SERVICES_ENDPOINT = "azure_speech_services_endpoint";
   private static final String KEY_COGNITIVE_SERVICES_SUBSCRIPTION_KEY = "azure_cognitive_services_subscription_key";
+  private static final String KEY_AZURE_SPEECH_RECOGNITION_MIN_CONFIDENCE = "azure_speech_recognition_min_confidence";
+
 
   private AssetManager assetManager;
   private OrganizationDirectoryService organizationDirectoryService;
@@ -100,6 +113,10 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   private String azureContainerName;
   private String azureSpeechServicesEndpoint;
   private String azureCognitiveServicesSubscriptionKey;
+  private MicrosoftAzureAuthorization azureAuthorization;
+  private MicrosoftAzureStorageClient azureStorageClient;
+  private MicrosoftAzureSpeechServicesClient azureSpeechServicesClient;
+  private Float azureSpeechRecognitionMinConfidence;
 
   private enum Operation {
     StartTranscription
@@ -120,7 +137,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     if (enabledOpt.isSome()) {
       enabled = enabledOpt.get();
     } else {
-      enabled = false;
+      deactivate(cc);
     }
 
     if (!enabled) {
@@ -135,7 +152,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       azureStorageAccountName = azureStorageAccountNameKeyOpt.get();
     } else {
       logger.warn("Azure storage account name key was not set. Disabling Microsoft Azure transcription service.");
-      enabled = false;
+      deactivate(cc);
       return;
     }
 
@@ -144,8 +161,38 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       azureAccountAccessKey = azureAccountAccessKeyKeyOpt.get();
     } else {
       logger.warn("Azure storage account access key was not set. Disabling Microsoft Azure transcription service.");
-      enabled = false;
+      deactivate(cc);
       return;
+    }
+
+    Option<String> azureSpeechServicesKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(),
+        KEY_AZURE_SPEECH_SERVICES_ENDPOINT);
+    if (azureSpeechServicesKeyOpt.isSome()) {
+      azureSpeechServicesEndpoint = azureSpeechServicesKeyOpt.get();
+    } else {
+      logger.warn("Azure speech services endpoint was not set. Disabling Microsoft Azure transcription service.");
+      deactivate(cc);
+      return;
+    }
+
+    Option<String> azureCognitiveServicesSubscriptionKeyKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(),
+        KEY_COGNITIVE_SERVICES_SUBSCRIPTION_KEY);
+    if (azureCognitiveServicesSubscriptionKeyKeyOpt.isSome()) {
+      azureCognitiveServicesSubscriptionKey = azureCognitiveServicesSubscriptionKeyKeyOpt.get();
+    } else {
+      logger.warn("Azure cognitive services subscription key was not set. "
+          + "Disabling Microsoft Azure transcription service.");
+      deactivate(cc);
+      return;
+    }
+
+    // optional values
+    Option<String> azureBlobPathKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(), KEY_AZURE_BOLB_PATH);
+    if (azureBlobPathKeyOpt.isSome()) {
+      azureBlobPath = azureBlobPathKeyOpt.get();
+    } else {
+      logger.debug("Azure blob path was not set, using default path.");
+      azureBlobPath = DEFAULT_AZURE_BLOB_PATH;
     }
 
     Option<String> languageOpt = OsgiUtil.getOptCfg(cc.getProperties(), KEY_LANGUAGE);
@@ -165,40 +212,47 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       azureContainerName = DEFAULT_AZURE_CONTAINER_NAME;
     }
 
-    Option<String> azureBlobPathKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(), KEY_AZURE_BOLB_PATH);
-    if (azureBlobPathKeyOpt.isSome()) {
-      azureBlobPath = azureBlobPathKeyOpt.get();
+    Option<String> azureSpeechRecognitionMinConfidenceKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(),
+        KEY_AZURE_SPEECH_RECOGNITION_MIN_CONFIDENCE);
+    if (azureSpeechRecognitionMinConfidenceKeyOpt.isSome()) {
+      String azureSpeechRecognitionMinConfidenceStr = azureSpeechRecognitionMinConfidenceKeyOpt.get();
+      try {
+        azureSpeechRecognitionMinConfidence = Float.valueOf(azureSpeechRecognitionMinConfidenceStr);
+      } catch (NumberFormatException e) {
+        logger.error("Azure speech recognition min confidence value is not valid. "
+            + "Please set a value between 0.0 and 1.0. "
+            + "Setting to default value of {}.", DEFAULT_MIN_CONFIDENCE);
+        azureSpeechRecognitionMinConfidence = DEFAULT_MIN_CONFIDENCE;
+      }
     } else {
-      logger.debug("Azure blob path was not set, using default path.");
-      azureBlobPath = DEFAULT_AZURE_BLOB_PATH;
+      logger.debug("Azure speech recognition min confidence value was not set. Setting to default value of {}.",
+          DEFAULT_MIN_CONFIDENCE);
+      azureSpeechRecognitionMinConfidence = DEFAULT_MIN_CONFIDENCE;
     }
 
-    Option<String> azureSpeechServicesKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(),
-        KEY_AZURE_SPEECH_SERVICES_ENDPOINT);
-    if (azureSpeechServicesKeyOpt.isSome()) {
-      azureSpeechServicesEndpoint = azureSpeechServicesKeyOpt.get();
-    } else {
-      logger.warn("Azure speech services endpoint was not set. Disabling Microsoft Azure transcription service.");
-      enabled = false;
+    //// create Azure storage client
+    try {
+      azureAuthorization = new MicrosoftAzureAuthorization(azureStorageAccountName, azureAccountAccessKey);
+      azureStorageClient = new MicrosoftAzureStorageClient(azureAuthorization);
+    } catch (MicrosoftAzureStorageClientException e) {
+      logger.error("Unable to create Microsoft Azure storage client. "
+          + "Deactivating Microsoft Azure Transcription service.", e);
+      deactivate(cc);
       return;
     }
 
-    Option<String> azureCognitiveServicesSubscriptionKeyKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(),
-        KEY_COGNITIVE_SERVICES_SUBSCRIPTION_KEY);
-    if (azureCognitiveServicesSubscriptionKeyKeyOpt.isSome()) {
-      azureCognitiveServicesSubscriptionKey = azureCognitiveServicesSubscriptionKeyKeyOpt.get();
-    } else {
-      logger.warn("Azure cognitive services subscription key was not set. "
-          + "Disabling Microsoft Azure transcription service.");
-      enabled = false;
-      return;
-    }
+    // create Azure Speech Services client
+    azureSpeechServicesClient = new MicrosoftAzureSpeechServicesClient(
+        azureSpeechServicesEndpoint, azureCognitiveServicesSubscriptionKey);
     logger.info("Activated.");
   }
 
   @Deactivate
   public void deactivate(ComponentContext cc) {
-
+    enabled = false;
+    azureAuthorization = null;
+    azureStorageClient = null;
+    azureSpeechServicesClient = null;
   }
 
   @Override
@@ -243,17 +297,87 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
 
   @Override
   public MediaPackageElement getGeneratedTranscription(String mpId, String jobId) throws TranscriptionServiceException {
-    throw new TranscriptionServiceException("Not implemented.");
+    MicrosoftAzureSpeechTranscription transcription;
+    try {
+      transcription = azureSpeechServicesClient.getTranscriptionById(jobId);
+    } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureSpeechClientException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Unable to get transcription '%s' for media package '%s'.", jobId, mpId), e);
+    }
+    if (!transcription.isSucceeded()) {
+      if (transcription.isRunning()) {
+        throw new TranscriptionServiceException(String.format("Unable to get generated transcription. "
+            + "Transcription job '%s' for media package '%s' is currently running.", jobId, mpId));
+      } else if (transcription.isFailed()) {
+        throw new TranscriptionServiceException(String.format("Unable to get generated transcription. "
+            + "Transcription job '%s' for media package '%s' is failed.", jobId, mpId));
+      }
+    }
+    // query transcription files
+    MicrosoftAzureSpeechTranscriptionFiles transcriptionFiles;
+    try {
+      transcriptionFiles = azureSpeechServicesClient.getTranscriptionFilesById(
+          jobId);
+    } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureSpeechClientException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Unable to get transcription files '%s' for media package '%s'.", jobId, mpId), e);
+    }
+    // download transcription file to workspace
+    MicrosoftAzureSpeechTranscriptionFile transcriptionFile = null;
+    for (MicrosoftAzureSpeechTranscriptionFile tf : transcriptionFiles.values) {
+      if (tf.isTranscriptionFile()) {
+        transcriptionFile = tf;
+        break;
+      }
+    }
+    if (transcriptionFile == null) {
+      // get more files with transcriptionFiles.nextLink
+      // TODO
+      throw new NotImplementedException("At least one transcription file should be provided.");
+    }
+
+    URI transcriptionFileUri;
+    try {
+      transcriptionFileUri = MicrosoftAzureSpeechServicesClient.getTranscriptionFile(transcriptionFile, workspace,
+          "webvtt", DEFAULT_MIN_CONFIDENCE);
+    } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureSpeechClientException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Unable to download transcription file '%s' for media package '%s'.", transcriptionFile.self, mpId), e);
+    }
+    String lang = Locale.forLanguageTag(transcription.locale).getLanguage();
+    String subtype;
+    if (StringUtils.isNotBlank(lang)) {
+      subtype = "vtt+" + lang;
+    } else {
+      subtype = "vtt";
+    }
+    return MediaPackageElementBuilderFactory.newInstance().newElementBuilder()
+        .elementFromURI(transcriptionFileUri, MediaPackageElement.Type.Attachment,
+            new MediaPackageElementFlavor("captions", subtype));
   }
 
   @Override
   public void transcriptionDone(String mpId, Object results) throws TranscriptionServiceException {
-
+    MicrosoftAzureSpeechTranscription transcription = (MicrosoftAzureSpeechTranscription) results;
+    try {
+      database.updateJobControl(transcription.getID(), TranscriptionJobControl.Status.TranscriptionComplete.name());
+    } catch (TranscriptionDatabaseException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Transcription job for media package '%s' succeeded but storing job status in the database failed."
+          , mpId), e);
+    }
   }
 
   @Override
   public void transcriptionError(String mpId, Object results) throws TranscriptionServiceException {
-
+    MicrosoftAzureSpeechTranscription transcription = (MicrosoftAzureSpeechTranscription) results;
+    try {
+      database.updateJobControl(transcription.getID(), TranscriptionJobControl.Status.Error.name());
+    } catch (TranscriptionDatabaseException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Transcription job for media package '%s' failed and storing job status in the database failed too."
+          , mpId), e);
+    }
   }
 
   @Override
@@ -279,15 +403,6 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
           "Unable to get track %s for transcription.", track.getURI()), e);
     }
     // upload media file to azure storage
-    //// create Azure storage client
-    MicrosoftAzureAuthorization azureAuthorization;
-    MicrosoftAzureStorageClient azureStorageClient;
-    try {
-      azureAuthorization = new MicrosoftAzureAuthorization(azureStorageAccountName, azureAccountAccessKey);
-      azureStorageClient = new MicrosoftAzureStorageClient(azureAuthorization);
-    } catch (MicrosoftAzureStorageClientException e) {
-      throw new TranscriptionServiceException("Unable to create Microsoft Azure storage client.", e);
-    }
     //// assure azure storage container exists
     try {
       azureStorageClient.createContainer(azureContainerName);
@@ -310,9 +425,6 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
         azureAuthorization.generateAccountSASToken("r", "b", null, null, null, null)));
     String azureDestContainerUrl = String.format("%s?%s", azureStorageClient.getContainerUrl(azureContainerName),
         azureAuthorization.generateAccountSASToken("rwl", "b", null, null, null, null));
-    // create Azure Speech Services client
-    MicrosoftAzureSpeechServicesClient azureSpeechServicesClient = new MicrosoftAzureSpeechServicesClient(
-        azureSpeechServicesEndpoint, azureCognitiveServicesSubscriptionKey);
     MicrosoftAzureSpeechTranscription transcription;
     try {
       transcription = azureSpeechServicesClient.createTranscription(contentUrls,
@@ -326,9 +438,15 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
           track.getURI(), mpId, azureContainerName), e);
     }
     // store transcription job ID and status
-
+    try {
+      database.updateJobControl(transcription.getID(), TranscriptionJobControl.Status.InProgress.name());
+    } catch (TranscriptionDatabaseException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Unable to store transcription job of track %s from media package '%s' in the database.",
+          track.getURI(), mpId), e);
+    }
     // return transcription job ID
-    return transcription.self;
+    return transcription.getID();
   }
 
   @Override

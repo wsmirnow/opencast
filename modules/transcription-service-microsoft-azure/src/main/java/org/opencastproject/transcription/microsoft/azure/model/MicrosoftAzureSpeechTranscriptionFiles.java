@@ -20,21 +20,25 @@
  */
 package org.opencastproject.transcription.microsoft.azure.model;
 
-public class MicrosoftAzureSpeechServicesErrorResponse {
+import com.google.gson.annotations.SerializedName;
+
+import java.util.List;
+
+public class MicrosoftAzureSpeechTranscriptionFiles {
+
+  // CHECKSTYLE:OFF checkstyle:LineLength
 
   // Documentation:
-  // https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_List
+  // https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_ListFiles
 
+  // CHECKSTYLE:ON checkstyle:LineLength
   // CHECKSTYLE:OFF checkstyle:VisibilityModifier
 
-  public class MicrosoftAzureSpeechServicesError {
-    public int code;
-    public String message;
-  }
-  public MicrosoftAzureSpeechServicesError error;
+  public List<MicrosoftAzureSpeechTranscriptionFile> values;
+  @SerializedName("@nextLink")
+  public String nextLink;
 
   // CHECKSTYLE:ON checkstyle:VisibilityModifier
 
-  /** Default constructor. */
-  public MicrosoftAzureSpeechServicesErrorResponse() { }
+  public MicrosoftAzureSpeechTranscriptionFiles() { }
 }
