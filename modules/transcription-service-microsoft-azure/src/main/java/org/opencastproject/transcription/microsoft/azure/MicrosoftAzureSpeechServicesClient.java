@@ -57,6 +57,7 @@ import java.util.UUID;
 public class MicrosoftAzureSpeechServicesClient {
 
   private static final Logger logger = LoggerFactory.getLogger(MicrosoftAzureSpeechServicesClient.class);
+  private static final String WORKSPACE_COLLECTION = "azure-speech-services";
   private static final String DEFAULT_TRANSCRIPTION_TIME_TO_LIVE = "P7D";
   private final String azureSpeechServicesEndpoint;
   private final String azureCognitiveServicesSubscriptionKey;
@@ -321,7 +322,7 @@ public class MicrosoftAzureSpeechServicesClient {
         content = transcriptionJson.toSrt(minConfidence);
       }
       try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
-        return workspace.putInCollection("azure-speech-services", fileName, is);
+        return workspace.putInCollection(WORKSPACE_COLLECTION, fileName, is);
       }
     }
   }
