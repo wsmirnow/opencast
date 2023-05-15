@@ -19,10 +19,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>
-        <!--dependency>
+        <dependency>
             <groupId>jakarta.ws.rs</groupId>
             <artifactId>jakarta.ws.rs-api</artifactId>
-        </dependency-->
+        </dependency>
         <dependency>
             <groupId>org.opencastproject</groupId>
             <artifactId>opencast-asset-manager-api</artifactId>

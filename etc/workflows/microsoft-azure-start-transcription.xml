@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<definition xmlns="http://workflow.opencastproject.org">
+
+  <id>microsoft-azure-start-transcription</id>
+  <title>Start Transcription</title>
+  <tags>
+    <tag>archive</tag>
+  </tags>
+  <displayOrder>1000</displayOrder>
+  <description>
+    Create Transcription with Microsoft Azure Speech Services
+  </description>
+  <configuration_panel/>
+  <operations>
+
+    <operation
+        id="encode"
+        exception-handler-workflow="partial-error"
+        description="Encoding videos to audio only format for transcription">
+      <configurations>
+        <configuration key="source-flavor">*/source</configuration>
+        <configuration key="target-flavor">*/audio</configuration>
+        <configuration key="encoding-profile">transcription-azure.audio</configuration>
+      </configurations>
+    </operation>
+
+    <operation
+        id="microsoft-azure-start-transcription"
+        exception-handler-workflow="partial-error"
+        description="Start transcription">
+      <configurations>
+        <configuration key="source-flavor">*/audio</configuration>
+        <!--configuration key="skip-if-flavor-exists">captions/vtt, captions/vtt+de, captions/vtt+en</configuration-->
+      </configurations>
+    </operation>
+
+    <!-- Clean up work artifacts -->
+
+    <operation
+      id="cleanup"
+      fail-on-error="false"
+      description="Remove temporary processing artifacts">
+      <configurations>
+        <!-- On systems with shared workspace or working file repository -->
+        <!-- you want to set this option to false. -->
+        <configuration key="delete-external">true</configuration>
+        <!-- ACLs are required again when working through ActiveMQ messages -->
+        <configuration key="preserve-flavors">security/*</configuration>
+      </configurations>
+    </operation>
+
+  </operations>
+</definition>

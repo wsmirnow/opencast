@@ -20,9 +20,14 @@
  */
 package org.opencastproject.transcription.microsoft.azure;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
+
+import java.io.IOException;
 
 public final class HttpUtils {
   private static final int CONNECTION_TIMEOUT = 1000 * 60;
@@ -44,5 +49,14 @@ public final class HttpUtils {
         .setDefaultRequestConfig(reqConfig)
         .build();
     return httpClient;
+  }
+
+  public static String formatResponseErrorString(HttpResponse response, String message) throws IOException {
+    String responseString = EntityUtils.toString(response.getEntity());
+    if (StringUtils.isNotBlank(message)) {
+      return String.format("%s Microsoft response: %s", message, responseString);
+    } else {
+      return String.format("Microsoft response: %s", responseString);
+    }
   }
 }

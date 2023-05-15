@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -119,6 +120,332 @@ public class MicrosoftAzureAuthorization {
     stringBuilder.append(StringUtils.trimToEmpty(signedEncryptionScope) + "\n");
     if (StringUtils.isNotBlank(signedEncryptionScope)) {
       queryArgs.add("ses=" + StringUtils.trimToEmpty(signedEncryptionScope));
+    }
+    String stringToSign = stringBuilder.toString();
+
+    Mac initializedMac = HmacUtils.getInitializedMac(HmacAlgorithms.HMAC_SHA_256,
+        Base64.decodeBase64(azureAccountAccessKey));
+    byte[] signedString = initializedMac.doFinal(stringToSign.getBytes(StandardCharsets.UTF_8));
+    String signature = Base64.encodeBase64String(signedString);
+    queryArgs.add("sig=" + URLEncoder.encode(signature, StandardCharsets.UTF_8));
+    return StringUtils.joinWith("&", queryArgs.toArray());
+  }
+
+  String generateServiceSasToken(String signedPermissions, Date signedStart, Date signedExpiry, String resource,
+      String signedResource) {
+    return  generateServiceSasToken(signedPermissions, signedStart, signedExpiry, resource, null, null, null,
+        signedResource, null, null, null, null, null, null, null, null);
+  }
+
+  String generateServiceSasToken(String signedPermissions, Date signedStart, Date signedExpiry, String resource,
+      String signedIdentifier, String signedIP, String signedVersion, String signedResource,
+      String signedDirectoryDepth, String signedSnapshotTime, String signedEncryptionScope,
+      String rscc, String rscd, String rsce, String rscl, String rsct) {
+    // documentation:
+    // https://learn.microsoft.com/en-us/rest/api/storageservices/create-service-sas
+    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+    df.setTimeZone(TimeZone.getTimeZone("UTC"));
+    List<String> queryArgs = new ArrayList<>();
+    StringBuilder stringBuilder = new StringBuilder();
+    /*
+    StringToSign = signedPermissions + "\n" +
+               signedStart + "\n" +
+               signedExpiry + "\n" +
+               canonicalizedResource + "\n" +
+               signedIdentifier + "\n" +
+               signedIP + "\n" +
+               signedProtocol + "\n" +
+               signedVersion + "\n" +
+               signedResource + "\n" +
+               signedSnapshotTime + "\n" +
+               signedEncryptionScope + "\n" +
+               rscc + "\n" +
+               rscd + "\n" +
+               rsce + "\n" +
+               rscl + "\n" +
+               rsct
+     */
+    //    signedPermissions (sp)
+    stringBuilder.append(StringUtils.trimToEmpty(signedPermissions) + "\n");
+    queryArgs.add("sp=" + StringUtils.trimToEmpty(signedPermissions));
+    //    signedStart (st)
+    if (signedStart == null) {
+      Date startDate = new Date(Calendar.getInstance().getTimeInMillis() + (-15 * MILLIS_IN_A_MINUTE));
+      stringBuilder.append(df.format(startDate) + "\n");
+      queryArgs.add("st=" + df.format(startDate));
+    } else {
+      stringBuilder.append(df.format(signedStart) + "\n");
+      queryArgs.add("st=" + df.format(signedStart));
+    }
+    //    signedExpiry (se)
+    if (signedExpiry == null) {
+      Date endDate = new Date(Calendar.getInstance().getTimeInMillis() + (1 * MILLIS_IN_A_DAY));
+      stringBuilder.append(df.format(endDate) + "\n");
+      queryArgs.add("se=" + df.format(endDate));
+    } else {
+      stringBuilder.append(df.format(signedExpiry) + "\n");
+      queryArgs.add("se=" + df.format(signedExpiry));
+    }
+    //    canonicalizedResource ()
+    String canonicalizedResource = Paths.get("/blob", azureStorageAccountName, StringUtils.trimToEmpty(resource))
+        .normalize().toString();
+    if (StringUtils.endsWith(canonicalizedResource,"/")) {
+      canonicalizedResource = StringUtils.substring(canonicalizedResource, 0, canonicalizedResource.length() - 1);
+    }
+    stringBuilder.append(canonicalizedResource + "\n");
+    //    signedIdentifier (si)
+    stringBuilder.append(StringUtils.trimToEmpty(signedIdentifier) + "\n");
+    if (StringUtils.isNotBlank(signedIdentifier)) {
+      queryArgs.add("si=" + StringUtils.trimToEmpty(signedIdentifier));
+    }
+    //    signedIP (sip)
+    stringBuilder.append(StringUtils.trimToEmpty(signedIP) + "\n");
+    if (StringUtils.isNotBlank(signedIP)) {
+      queryArgs.add("sip=" + StringUtils.trimToEmpty(signedIP));
+    }
+    //    signedProtocol (spr)
+    stringBuilder.append("https" + "\n");
+    queryArgs.add("spr=https");
+    //    signedVersion (sv)
+    if (StringUtils.isNotBlank(signedVersion)) {
+      stringBuilder.append(StringUtils.trimToEmpty(signedVersion) + "\n");
+      queryArgs.add("sv=" + StringUtils.trimToEmpty(signedVersion));
+    } else {
+      stringBuilder.append(AZURE_STORAGE_VERSION + "\n");
+      queryArgs.add("sv=" + AZURE_STORAGE_VERSION);
+    }
+    //    signedResource (sr)
+    stringBuilder.append(StringUtils.trimToEmpty(signedResource) + "\n");
+    if (StringUtils.isNotBlank(signedResource)) {
+      queryArgs.add("sr=" + StringUtils.trimToEmpty(signedResource));
+    }
+    //    sr=d -> signedDirectoryDepth (sdd)
+    if (StringUtils.isNotBlank(signedDirectoryDepth)) {
+      queryArgs.add("sdd=" + StringUtils.trimToEmpty(signedDirectoryDepth));
+    }
+    stringBuilder.append(StringUtils.trimToEmpty(signedSnapshotTime) + "\n");
+    //    if (StringUtils.isNotBlank(signedSnapshotTime)) {
+    //      queryArgs.add("sst???=" + StringUtils.trimToEmpty(signedSnapshotTime));
+    //    }
+    //    signedEncryptionScope (ses)
+    stringBuilder.append(StringUtils.trimToEmpty(signedEncryptionScope) + "\n");
+    if (StringUtils.isNotBlank(signedEncryptionScope)) {
+      queryArgs.add("ses=" + StringUtils.trimToEmpty(signedEncryptionScope));
+    }
+    //    rscc = Cache-Control (rscc)
+    stringBuilder.append(StringUtils.trimToEmpty(rscc) + "\n");
+    if (StringUtils.isNotBlank(rscc)) {
+      queryArgs.add("rscc=" + StringUtils.trimToEmpty(rscc));
+    }
+    //    rscd = Content-Disposition (rscd)
+    stringBuilder.append(StringUtils.trimToEmpty(rscd) + "\n");
+    if (StringUtils.isNotBlank(rscd)) {
+      queryArgs.add("rscd=" + StringUtils.trimToEmpty(rscd));
+    }
+    //    rsce = Content-Encoding (rsce)
+    stringBuilder.append(StringUtils.trimToEmpty(rsce) + "\n");
+    if (StringUtils.isNotBlank(rsce)) {
+      queryArgs.add("rsce=" + StringUtils.trimToEmpty(rsce));
+    }
+    //    rscl = Content-Language (rscl)
+    stringBuilder.append(StringUtils.trimToEmpty(rscl) + "\n");
+    if (StringUtils.isNotBlank(rscl)) {
+      queryArgs.add("rscl=" + StringUtils.trimToEmpty(rscl));
+    }
+    //    rsct = Content-Type (rsct)
+    stringBuilder.append(StringUtils.trimToEmpty(rsct) + "\n");
+    if (StringUtils.isNotBlank(rsct)) {
+      queryArgs.add("rsct=" + StringUtils.trimToEmpty(rsct));
+    }
+    String stringToSign = stringBuilder.toString();
+
+    Mac initializedMac = HmacUtils.getInitializedMac(HmacAlgorithms.HMAC_SHA_256,
+        Base64.decodeBase64(azureAccountAccessKey));
+    byte[] signedString = initializedMac.doFinal(stringToSign.getBytes(StandardCharsets.UTF_8));
+    String signature = Base64.encodeBase64String(signedString);
+    queryArgs.add("sig=" + URLEncoder.encode(signature, StandardCharsets.UTF_8));
+    return StringUtils.joinWith("&", queryArgs.toArray());
+  }
+
+  String generateUserDelegationSASToken(String signedPermissions, Date signedStart, Date signedExpiry,
+      String resource, String signedResource) {
+    return generateUserDelegationSASToken(signedPermissions, signedStart, signedExpiry, resource, null, null, null,
+        null, null, null, null, null, null, null, null, signedResource, null, null, null,
+        null, null, null, null, null);
+  }
+  String generateUserDelegationSASToken(String signedPermissions, Date signedStart, Date signedExpiry,
+      String resource, String signedKeyObjectId, String signedKeyTenantId, Date signedKeyStart,
+      Date signedKeyExpiry, String signedKeyService, String signedKeyVersion, String signedAuthorizedUserObjectId,
+      String signedUnauthorizedUserObjectId, String signedCorrelationId, String signedIP, String signedVersion,
+      String signedResource, String signedDirectoryDepth, String signedSnapshotTime, String signedEncryptionScope,
+      String rscc, String rscd, String rsce, String rscl, String rsct) {
+    // documentation: https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas
+    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+    df.setTimeZone(TimeZone.getTimeZone("UTC"));
+    List<String> queryArgs = new ArrayList<>();
+    StringBuilder stringBuilder = new StringBuilder();
+    /*
+    StringToSign =  signedPermissions + "\n" +
+                    signedStart + "\n" +
+                    signedExpiry + "\n" +
+                    canonicalizedResource + "\n" +
+                    signedKeyObjectId + "\n" +
+                    signedKeyTenantId + "\n" +
+                    signedKeyStart + "\n" +
+                    signedKeyExpiry  + "\n" +
+                    signedKeyService + "\n" +
+                    signedKeyVersion + "\n" +
+                    signedAuthorizedUserObjectId + "\n" +
+                    signedUnauthorizedUserObjectId + "\n" +
+                    signedCorrelationId + "\n" +
+                    signedIP + "\n" +
+                    signedProtocol + "\n" +
+                    signedVersion + "\n" +
+                    signedResource + "\n" +
+                    signedSnapshotTime + "\n" +
+                    signedEncryptionScope + "\n" +
+                    rscc + "\n" +
+                    rscd + "\n" +
+                    rsce + "\n" +
+                    rscl + "\n" +
+                    rsct
+    **/
+    //    signedPermissions (sp)
+    stringBuilder.append(StringUtils.trimToEmpty(signedPermissions) + "\n");
+    queryArgs.add("sp=" + StringUtils.trimToEmpty(signedPermissions));
+    //    signedStart (st)
+    if (signedStart == null) {
+      Date startDate = new Date(Calendar.getInstance().getTimeInMillis() + (-15 * MILLIS_IN_A_MINUTE));
+      stringBuilder.append(df.format(startDate) + "\n");
+      queryArgs.add("st=" + df.format(startDate));
+    } else {
+      stringBuilder.append(df.format(signedStart) + "\n");
+      queryArgs.add("st=" + df.format(signedStart));
+    }
+    //    signedExpiry (se)
+    if (signedExpiry == null) {
+      Date endDate = new Date(Calendar.getInstance().getTimeInMillis() + (1 * MILLIS_IN_A_DAY));
+      stringBuilder.append(df.format(endDate) + "\n");
+      queryArgs.add("se=" + df.format(endDate));
+    } else {
+      stringBuilder.append(df.format(signedExpiry) + "\n");
+      queryArgs.add("se=" + df.format(signedExpiry));
+    }
+    //    canonicalizedResource ()
+    String canonicalizedResource = Paths.get("/blob", azureStorageAccountName, StringUtils.trimToEmpty(resource))
+        .normalize().toString();
+    if (StringUtils.endsWith(canonicalizedResource,"/")) {
+      canonicalizedResource = StringUtils.substring(canonicalizedResource, 0, canonicalizedResource.length() - 1);
+    }
+    stringBuilder.append(canonicalizedResource + "\n");
+    //    signedKeyObjectId (skoid)
+    stringBuilder.append(StringUtils.trimToEmpty(signedKeyObjectId) + "\n");
+    if (StringUtils.isNotBlank(signedKeyObjectId)) {
+      queryArgs.add("skoid=" + StringUtils.trimToEmpty(signedKeyObjectId));
+    }
+    //    signedKeyTenantId (sktid)
+    stringBuilder.append(StringUtils.trimToEmpty(signedKeyTenantId) + "\n");
+    if (StringUtils.isNotBlank(signedKeyTenantId)) {
+      queryArgs.add("sktid=" + StringUtils.trimToEmpty(signedKeyTenantId));
+    }
+    //    signedKeyStart (skt)
+    if (signedKeyStart != null) {
+      stringBuilder.append(df.format(signedKeyStart) + "\n");
+      queryArgs.add("skt=" + df.format(signedKeyStart));
+    } else {
+      stringBuilder.append("\n");
+    }
+    //    signedKeyExpiry (ske)
+    if (signedKeyExpiry != null) {
+      stringBuilder.append(df.format(signedKeyExpiry) + "\n");
+      queryArgs.add("ske=" + df.format(signedKeyExpiry));
+    } else {
+      stringBuilder.append("\n");
+    }
+    //    signedKeyService (sks)
+    stringBuilder.append(StringUtils.trimToEmpty(signedKeyService) + "\n");
+    if (StringUtils.isNotBlank(signedKeyService)) {
+      queryArgs.add("sks=" + StringUtils.trimToEmpty(signedKeyService));
+    }
+    //    signedKeyVersion (skv)
+    stringBuilder.append(StringUtils.trimToEmpty(signedKeyVersion) + "\n");
+    if (StringUtils.isNotBlank(signedKeyVersion)) {
+      queryArgs.add("skv=" + StringUtils.trimToEmpty(signedKeyVersion));
+    }
+    //    signedAuthorizedUserObjectId (saoid)
+    stringBuilder.append(StringUtils.trimToEmpty(signedAuthorizedUserObjectId) + "\n");
+    if (StringUtils.isNotBlank(signedAuthorizedUserObjectId)) {
+      queryArgs.add("saoid=" + StringUtils.trimToEmpty(signedAuthorizedUserObjectId));
+    }
+    //    signedUnauthorizedUserObjectId (suoid)
+    stringBuilder.append(StringUtils.trimToEmpty(signedUnauthorizedUserObjectId) + "\n");
+    if (StringUtils.isNotBlank(signedUnauthorizedUserObjectId)) {
+      queryArgs.add("suoid=" + StringUtils.trimToEmpty(signedUnauthorizedUserObjectId));
+    }
+    //    signedCorrelationId (scid)
+    stringBuilder.append(StringUtils.trimToEmpty(signedCorrelationId) + "\n");
+    if (StringUtils.isNotBlank(signedCorrelationId)) {
+      queryArgs.add("scid=" + StringUtils.trimToEmpty(signedCorrelationId));
+    }
+    //    signedIP (sip)
+    stringBuilder.append(StringUtils.trimToEmpty(signedIP) + "\n");
+    if (StringUtils.isNotBlank(signedIP)) {
+      queryArgs.add("sip=" + StringUtils.trimToEmpty(signedIP));
+    }
+    //    signedProtocol (spr)
+    stringBuilder.append("https" + "\n");
+    queryArgs.add("spr=https");
+    //    signedVersion (sv)
+    if (StringUtils.isNotBlank(signedVersion)) {
+      stringBuilder.append(StringUtils.trimToEmpty(signedVersion) + "\n");
+      queryArgs.add("sv=" + StringUtils.trimToEmpty(signedVersion));
+    } else {
+      stringBuilder.append(AZURE_STORAGE_VERSION + "\n");
+      queryArgs.add("sv=" + AZURE_STORAGE_VERSION);
+    }
+    //    signedResource (sr)
+    stringBuilder.append(StringUtils.trimToEmpty(signedResource) + "\n");
+    if (StringUtils.isNotBlank(signedResource)) {
+      queryArgs.add("sr=" + StringUtils.trimToEmpty(signedResource));
+    }
+    //    sr=d -> signedDirectoryDepth (sdd)
+    if (StringUtils.isNotBlank(signedDirectoryDepth)) {
+      queryArgs.add("sdd=" + StringUtils.trimToEmpty(signedDirectoryDepth));
+    }
+    //    signedSnapshotTime ()
+    stringBuilder.append(StringUtils.trimToEmpty(signedSnapshotTime) + "\n");
+//    if (StringUtils.isNotBlank(signedSnapshotTime)) {
+//      queryArgs.add("sst???=" + StringUtils.trimToEmpty(signedSnapshotTime));
+//    }
+    //    signedEncryptionScope (ses)
+    stringBuilder.append(StringUtils.trimToEmpty(signedEncryptionScope) + "\n");
+    if (StringUtils.isNotBlank(signedEncryptionScope)) {
+      queryArgs.add("ses=" + StringUtils.trimToEmpty(signedEncryptionScope));
+    }
+    //    rscc = Cache-Control (rscc)
+    stringBuilder.append(StringUtils.trimToEmpty(rscc) + "\n");
+    if (StringUtils.isNotBlank(rscc)) {
+      queryArgs.add("rscc=" + StringUtils.trimToEmpty(rscc));
+    }
+    //    rscd = Content-Disposition (rscd)
+    stringBuilder.append(StringUtils.trimToEmpty(rscd) + "\n");
+    if (StringUtils.isNotBlank(rscd)) {
+      queryArgs.add("rscd=" + StringUtils.trimToEmpty(rscd));
+    }
+    //    rsce = Content-Encoding (rsce)
+    stringBuilder.append(StringUtils.trimToEmpty(rsce) + "\n");
+    if (StringUtils.isNotBlank(rsce)) {
+      queryArgs.add("rsce=" + StringUtils.trimToEmpty(rsce));
+    }
+    //    rscl = Content-Language (rscl)
+    stringBuilder.append(StringUtils.trimToEmpty(rscl) + "\n");
+    if (StringUtils.isNotBlank(rscl)) {
+      queryArgs.add("rscl=" + StringUtils.trimToEmpty(rscl));
+    }
+    //    rsct = Content-Type (rsct)
+    stringBuilder.append(StringUtils.trimToEmpty(rsct) + "\n");
+    if (StringUtils.isNotBlank(rsct)) {
+      queryArgs.add("rsct=" + StringUtils.trimToEmpty(rsct));
     }
     String stringToSign = stringBuilder.toString();
 

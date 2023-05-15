@@ -30,6 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.List;
 
 public class MicrosoftAzureSpeechServicesClientTest {
@@ -73,5 +75,33 @@ public class MicrosoftAzureSpeechServicesClientTest {
         transcriptionId);
     Assert.assertNotNull(transcription);
     Assert.assertTrue(transcription.self.contains(transcriptionId));
+  }
+
+  @Test
+  public void createTranscription()
+          throws URISyntaxException, MicrosoftAzureNotAllowedException, IOException,
+          MicrosoftAzureSpeechClientException, MicrosoftAzureStorageClientException {
+    if (!enabled) {
+      return;
+    }
+    String contentUrl = "https://storage.blob.core.windows.net/opencast-transcriptions/test.ogg";
+    String destContainerUrl = "https://storage.blob.core.windows.net/opencast-transcriptions";
+    String azureStorageAccountName = "storage";
+    String azureAccountAccessKey = "access_key";
+    MicrosoftAzureAuthorization azureAuthorization = new MicrosoftAzureAuthorization(azureStorageAccountName,
+        azureAccountAccessKey);
+    //String sasToken = azureAuthorization.generateServiceSasToken("clw", null, null, "/opencast-transcriptions", null,
+    //    null, null, "c", null, null, null, null, null, null, null, null);
+    //String sasToken = azureAuthorization.generateServiceSasToken("clw", null, null, "/opencast-transcriptions", "c");
+    //String sasToken = azureAuthorization.generateUserDelegationSASToken("clw", null, null, "/opencast-transcriptions",
+    //    null, null, null, null, null, null, null, null, null, null, null, "c", null, null, null, null, null, null,
+    //    null, null);
+    String sasToken = azureAuthorization.generateUserDelegationSASToken("cw", null, null, "/opencast-transcriptions",
+        "c");
+
+    MicrosoftAzureSpeechTranscription transcription = azureSpeechClient.createTranscription(Arrays.asList(contentUrl),
+        destContainerUrl + "?" + sasToken, "Test createTranscription", "de-DE", null, "PT1H", null);
+    Assert.assertNotNull(transcription);
+
   }
 }

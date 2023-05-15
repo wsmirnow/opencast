@@ -89,8 +89,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-@Component(immediate = true, service = { TranscriptionService.class,
-    MicrosoftAzureTranscriptionService.class }, property = {
+@Component(immediate = true, service = {
+    TranscriptionService.class, MicrosoftAzureTranscriptionService.class }, property = {
     "service.description=Microsoft Azure Transcription Service", "provider=microsoft.azure" })
 public class MicrosoftAzureTranscriptionService extends AbstractJobProducer implements TranscriptionService {
 
@@ -98,7 +98,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
 
   private static final String JOB_TYPE = "org.opencastproject.transcription.microsoft.azure";
   private static final String PROVIDER = "microsoft-azure-speech-services";
-  private static final String DEFAULT_WORKFLOW_DEFINITION_ID = "microsoft-azure-attach-transcripts";
+  private static final String DEFAULT_WORKFLOW_DEFINITION_ID = "microsoft-azure-attach-transcription";
   private static final String DEFAULT_LANGUAGE = "en-GB";
   private static final String DEFAULT_AZURE_BLOB_PATH = "";
   private static final String DEFAULT_AZURE_CONTAINER_NAME = "opencast-transcriptions";
@@ -117,15 +117,14 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
 
   private AssetManager assetManager;
   private OrganizationDirectoryService organizationDirectoryService;
-  private ScheduledExecutorService scheduledExecutor;
   private SecurityService securityService;
   private ServiceRegistry serviceRegistry;
   private TranscriptionDatabase database;
   private UserDirectoryService userDirectoryService;
   private WorkflowService workflowService;
   private Workspace workspace;
-  private Workflows wfUtil;
   private ScheduledExecutorService scheduledExecutorService;
+  private Workflows wfUtil;
   private String systemAccount;
   private boolean enabled;
   private String language;
@@ -153,14 +152,21 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   }
 
   @Activate
+  public void activate(ComponentContext cc) {
+    super.activate(cc);
+    systemAccount = OsgiUtil.getContextProperty(cc, OpencastConstants.DIGEST_USER_PROPERTY);
+    logger.debug("Activating...");
+    modified(cc);
+  }
+
   @Modified
   public void modified(ComponentContext cc) {
-    super.activate(cc);
+    logger.debug("Updating config...");
     Option<Boolean> enabledOpt = OsgiUtil.getOptCfgAsBoolean(cc.getProperties(), KEY_ENABLED);
     if (enabledOpt.isSome()) {
       enabled = enabledOpt.get();
     } else {
-      deactivate(cc);
+      deactivate();
     }
 
     if (!enabled) {
@@ -175,7 +181,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       azureStorageAccountName = azureStorageAccountNameKeyOpt.get();
     } else {
       logger.warn("Azure storage account name key was not set. Disabling Microsoft Azure transcription service.");
-      deactivate(cc);
+      deactivate();
       return;
     }
 
@@ -184,7 +190,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       azureAccountAccessKey = azureAccountAccessKeyKeyOpt.get();
     } else {
       logger.warn("Azure storage account access key was not set. Disabling Microsoft Azure transcription service.");
-      deactivate(cc);
+      deactivate();
       return;
     }
 
@@ -194,7 +200,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       azureSpeechServicesEndpoint = azureSpeechServicesKeyOpt.get();
     } else {
       logger.warn("Azure speech services endpoint was not set. Disabling Microsoft Azure transcription service.");
-      deactivate(cc);
+      deactivate();
       return;
     }
 
@@ -205,7 +211,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     } else {
       logger.warn("Azure cognitive services subscription key was not set. "
           + "Disabling Microsoft Azure transcription service.");
-      deactivate(cc);
+      deactivate();
       return;
     }
 
@@ -262,8 +268,6 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       azureSpeechRecognitionMinConfidence = DEFAULT_MIN_CONFIDENCE;
     }
 
-    systemAccount = OsgiUtil.getContextProperty(cc, OpencastConstants.DIGEST_USER_PROPERTY);
-
     //// create Azure storage client
     try {
       azureAuthorization = new MicrosoftAzureAuthorization(azureStorageAccountName, azureAccountAccessKey);
@@ -271,7 +275,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     } catch (MicrosoftAzureStorageClientException e) {
       logger.error("Unable to create Microsoft Azure storage client. "
           + "Deactivating Microsoft Azure Transcription service.", e);
-      deactivate(cc);
+      deactivate();
       return;
     }
 
@@ -280,9 +284,9 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
         azureSpeechServicesEndpoint, azureCognitiveServicesSubscriptionKey);
 
     if (scheduledExecutorService != null) {
-      scheduledExecutor.shutdown();
+      scheduledExecutorService.shutdown();
       try {
-        scheduledExecutor.awaitTermination(60, TimeUnit.SECONDS);
+        scheduledExecutorService.awaitTermination(60, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
         // pending task took to long
         // pending task will be restarted on next run
@@ -294,12 +298,12 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   }
 
   @Deactivate
-  public void deactivate(ComponentContext cc) {
+  public void deactivate() {
     enabled = false;
     if (scheduledExecutorService != null) {
-      scheduledExecutor.shutdown();
+      scheduledExecutorService.shutdown();
       try {
-        scheduledExecutor.awaitTermination(60, TimeUnit.SECONDS);
+        scheduledExecutorService.awaitTermination(60, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
         // pending task took to long
         // pending task will be restarted on next run
@@ -308,6 +312,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     azureAuthorization = null;
     azureStorageClient = null;
     azureSpeechServicesClient = null;
+    logger.info("Deactivated.");
   }
 
   @Override
@@ -322,6 +327,9 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
         String mpId = arguments.get(0);
         Track track = (Track) MediaPackageElementParser.getFromXml(arguments.get(1));
         String languageCode = arguments.get(2);
+        if (StringUtils.isBlank(languageCode)) {
+          languageCode = getLanguage();
+        }
         return createTranscriptionJob(jobId, mpId, track, languageCode);
       default:
         throw new IllegalStateException("Don't know how to handle operation '" + operation + "'");
@@ -340,7 +348,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       jobArgs.add(mpId);
       jobArgs.add(MediaPackageElementParser.getAsXml(track));
       jobArgs.addAll(Arrays.asList(args));
-      return serviceRegistry.createJob(JOB_TYPE, Operation.StartTranscription.toString(),jobArgs);
+      return serviceRegistry.createJob(JOB_TYPE, Operation.StartTranscription.toString(), jobArgs);
     } catch (ServiceRegistryException e) {
       throw new TranscriptionServiceException(String.format(
           "Unable to create transcription job for media package '%s'.", mpId), e);
@@ -414,6 +422,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   @Override
   public void transcriptionDone(String mpId, Object results) throws TranscriptionServiceException {
     MicrosoftAzureSpeechTranscription transcription = (MicrosoftAzureSpeechTranscription) results;
+    logger.info("Transcription job {} for media package {} done.", transcription.getID(), mpId);
     try {
       database.updateJobControl(transcription.getID(), TranscriptionJobControl.Status.TranscriptionComplete.name());
     } catch (TranscriptionDatabaseException e) {
@@ -426,6 +435,13 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   @Override
   public void transcriptionError(String mpId, Object results) throws TranscriptionServiceException {
     MicrosoftAzureSpeechTranscription transcription = (MicrosoftAzureSpeechTranscription) results;
+    String message = "";
+    if (transcription != null && transcription.properties != null && transcription.properties.containsKey("error")) {
+      Map<String, Object> errorInfo = (Map<String, Object>) transcription.properties.get("error");
+      message = String.format(" Microsoft error code %s: %s", errorInfo.getOrDefault("code", "UNKNOWN"),
+          errorInfo.getOrDefault("message", "No info"));
+    }
+    logger.info("Transcription job {} for media package {} failed.{}", transcription.getID(), mpId, message);
     try {
       database.updateJobControl(transcription.getID(), TranscriptionJobControl.Status.Error.name());
     } catch (TranscriptionDatabaseException e) {
@@ -476,10 +492,9 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
           track.getURI(), mpId, azureContainerName), e);
     }
     // start azure transcription job
-    List<String> contentUrls = Arrays.asList(String.format("%s?%s", azureBlobUrl,
-        azureAuthorization.generateAccountSASToken("r", "b", null, null, null, null)));
+    List<String> contentUrls = Arrays.asList(azureBlobUrl);
     String azureDestContainerUrl = String.format("%s?%s", azureStorageClient.getContainerUrl(azureContainerName),
-        azureAuthorization.generateAccountSASToken("rwl", "b", null, null, null, null));
+        azureAuthorization.generateServiceSasToken("cw", null, null, azureContainerName, "c"));
     MicrosoftAzureSpeechTranscription transcription;
     try {
       transcription = azureSpeechServicesClient.createTranscription(contentUrls,
@@ -532,18 +547,18 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     // Build workflow
     Map<String, String> params = new HashMap<>();
     params.put("transcriptionJobId", transcription.getID());
+    String locale = "";
+    String language = "";
     if (StringUtils.isNotBlank(transcription.locale)) {
-      params.put("transcriptionLocale", transcription.locale);
-      params.put("transcriptionLocaleSet", "true");
-      params.put("transcriptionLocaleSubtypeSuffix", "+" + transcription.locale);
-      String lang = Locale.forLanguageTag(transcription.locale).getLanguage();
-      params.put("transcriptionLanguage", lang);
-      params.put("transcriptionLanguageSet", "true");
-      params.put("transcriptionLangSubtypeSuffix", "+" + lang);
-    } else {
-      params.put("transcriptionLocaleSet", "false");
-      params.put("transcriptionLanguageSet", "false");
+      locale = transcription.locale;
+      language = Locale.forLanguageTag(transcription.locale).getLanguage();
     }
+    params.put("transcriptionLocale", locale);
+    params.put("transcriptionLocaleSet", Boolean.toString(!StringUtils.isEmpty(locale)));
+    params.put("transcriptionLocaleSubtypeSuffix", !StringUtils.isEmpty(locale) ? "+" + transcription.locale : "");
+    params.put("transcriptionLanguage", language);
+    params.put("transcriptionLanguageSet", Boolean.toString(!StringUtils.isEmpty(language)));
+    params.put("transcriptionLanguageSubtypeSuffix", !StringUtils.isEmpty(language) ? "+" + language : "");
     WorkflowDefinition wfDef = workflowService.getWorkflowDefinitionById(workflowDefinitionId);
 
     // Apply workflow

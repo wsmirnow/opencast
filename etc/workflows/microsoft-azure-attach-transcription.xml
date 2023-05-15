@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<definition xmlns="http://workflow.opencastproject.org">
+
+  <id>microsoft-azure-attach-transcription</id>
+  <title>Attach Transcription</title>
+  <tags>
+  </tags>
+  <description>
+    Attach Transcription from Microsoft Azure Speech Services
+  </description>
+  <configuration_panel/>
+  <operations>
+
+    <operation
+        id="tag"
+        exception-handler-workflow="partial-error"
+        description="Drop existing transcriptions">
+      <configurations>
+        <configuration key="source-flavor">captions/*</configuration>
+        <configuration key="target-flavor">captions+drop/*</configuration>
+        <configuration key="target-tags">-archive</configuration>
+      </configurations>
+    </operation>
+
+    <operation
+        id="microsoft-azure-attach-transcription"
+        exception-handler-workflow="partial-error"
+        description="Attach transcription">
+      <configurations>
+        <configuration key="transcription-job-id">${transcriptionJobId}</configuration>
+        <configuration key="target-flavor">captions/vtt${transcriptionLanguageSubtypeSuffix}</configuration>
+        <configuration key="target-tags">archive</configuration>
+      </configurations>
+    </operation>
+
+    <!-- Archive the recording -->
+
+    <operation
+        id="snapshot"
+        description="Archive publishing information">
+      <configurations>
+        <configuration key="source-tags">archive</configuration>
+      </configurations>
+    </operation>
+
+    <operation
+        id="publish-engage"
+        max-attempts="2"
+        fail-on-error="true"
+        exception-handler-workflow="partial-error"
+        description="Publish transcription to engage player">
+      <configurations>
+        <configuration key="download-source-flavors">captions/vtt${transcriptionLanguageSubtypeSuffix}</configuration>
+        <configuration key="check-availability">true</configuration>
+        <configuration key="strategy">merge</configuration>
+      </configurations>
+    </operation>
+
+    <!-- Clean up work artifacts -->
+
+    <operation
+      id="cleanup"
+      fail-on-error="false"
+      description="Remove temporary processing artifacts">
+      <configurations>
+        <!-- On systems with shared workspace or working file repository -->
+        <!-- you want to set this option to false. -->
+        <configuration key="delete-external">true</configuration>
+        <!-- ACLs are required again when working through ActiveMQ messages -->
+        <configuration key="preserve-flavors">security/*</configuration>
+      </configurations>
+    </operation>
+
+  </operations>
+</definition>
