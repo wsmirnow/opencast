@@ -18,7 +18,7 @@
         exception-handler-workflow="partial-error"
         description="Start transcription">
       <configurations>
-        <configuration key="source-flavor">*/audio</configuration>
+        <configuration key="source-flavors">*/prepared, */source</configuration>
         <!--configuration key="skip-if-flavor-exists">captions/vtt, captions/vtt+de, captions/vtt+en</configuration-->
         <configuration key="audio-extraction-encoding-profile">transcription-azure.audio</configuration>
       </configurations>

@@ -100,11 +100,13 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   private static final String PROVIDER = "microsoft-azure-speech-services";
   private static final String DEFAULT_WORKFLOW_DEFINITION_ID = "microsoft-azure-attach-transcription";
   private static final String DEFAULT_LANGUAGE = "en-GB";
+
   private static final String DEFAULT_AZURE_BLOB_PATH = "";
   private static final String DEFAULT_AZURE_CONTAINER_NAME = "opencast-transcriptions";
   private static final float DEFAULT_MIN_CONFIDENCE = 0.7f;
   private static final String KEY_ENABLED = "enabled";
   private static final String KEY_LANGUAGE = "language";
+  private static final String KEY_AUTO_DETECT_LANGUAGES = "auto.detect.languages";
   private static final String KEY_WORKFLOW = "workflow";
   private static final String KEY_AZURE_STORAGE_ACCOUNT_NAME = "azure_storage_account_name";
   private static final String KEY_AZURE_ACCOUNT_ACCESS_KEY = "azure_account_access_key";
@@ -128,6 +130,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   private String systemAccount;
   private boolean enabled;
   private String language;
+  private List<String> autodetectLanguages;
   private String workflowDefinitionId;
   private String azureStorageAccountName;
   private String azureAccountAccessKey;
@@ -240,6 +243,16 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     } else {
       language = DEFAULT_LANGUAGE;
       logger.info("Default language '{}' will be used.", language);
+    }
+
+    autodetectLanguages = new ArrayList<>();
+    Option<String> autoDetectLanguagesOpt = OsgiUtil.getOptCfg(cc.getProperties(), KEY_AUTO_DETECT_LANGUAGES);
+    if (languageOpt.isSome()) {
+      for (String lang : StringUtils.split(autoDetectLanguagesOpt.get(), ",")) {
+        if (StringUtils.isNotBlank(lang)) {
+          autodetectLanguages.add(StringUtils.trimToEmpty(lang));
+        }
+      }
     }
 
     Option<String> azureContainerNameKeyOpt = OsgiUtil.getOptCfg(cc.getProperties(), KEY_AZURE_CONTAINER_NAME);
@@ -498,7 +511,8 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     MicrosoftAzureSpeechTranscription transcription;
     try {
       transcription = azureSpeechServicesClient.createTranscription(contentUrls,
-          azureDestContainerUrl, String.format("Transcription job %d", jobId), language, null, null, null);
+          azureDestContainerUrl, String.format("Transcription job %d", jobId), language, autodetectLanguages,
+          null, null);
       logger.info("Started transcription of {} from media package '{}' on Microsoft Azure Speech Services at {}",
           track.getURI(), mpId, transcription.self);
     } catch (MicrosoftAzureNotAllowedException | IOException | MicrosoftAzureSpeechClientException e) {
