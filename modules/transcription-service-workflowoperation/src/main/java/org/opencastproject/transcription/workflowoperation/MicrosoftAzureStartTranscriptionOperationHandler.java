@@ -160,42 +160,43 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
     }
 
     Collection<Track> elements = elementSelector.select(mediaPackage, false);
-    Job job = null;
     Track audioTrack = null;
-    for (Track track : elements) {
-      try {
-        EncodingProfile profile = composerService.getProfile(encodingProfile);
-        if (profile == null) {
-          throw new WorkflowOperationException("Encoding profile '" + encodingProfile + "' was not found.");
+    try {
+      for (Track track : elements) {
+        try {
+          EncodingProfile profile = composerService.getProfile(encodingProfile);
+          if (profile == null) {
+            throw new WorkflowOperationException("Encoding profile '" + encodingProfile + "' was not found.");
+          }
+          Job encodeJob = composerService.encode(track, encodingProfile);
+          if (!waitForStatus(encodeJob).isSuccess()) {
+            throw new WorkflowOperationException(String.format(
+                "Audio extraction job for track %s did not complete successfully.", track.getURI()));
+          }
+          audioTrack = (Track) MediaPackageElementParser.getFromXml(encodeJob.getPayload());
+        } catch (EncoderException | MediaPackageException e) {
+          throw new WorkflowOperationException(
+              String.format("Extracting audio for transcription failed for the track %s", track.getURI()), e);
         }
-        Job encodeJob = composerService.encode(track, encodingProfile);
-        if (!waitForStatus(encodeJob).isSuccess()) {
-          throw new WorkflowOperationException(String.format(
-              "Audio extraction job for track %s did not complete successfully.", track.getURI()));
+        try {
+          Job transcriptionJob = service.startTranscription(mediaPackage.getIdentifier().toString(), audioTrack,
+              language);
+          // Wait for the jobs to return
+          if (!waitForStatus(transcriptionJob).isSuccess()) {
+            throw new WorkflowOperationException("Transcription job did not complete successfully.");
+          }
+          // Return OK means that the transcription job was created, but not finished yet
+          logger.debug("External transcription job for media package '{}' was created.", mediaPackage.getIdentifier());
+          // Only one job per media package
+          break;
+        } catch (TranscriptionServiceException e) {
+          throw new WorkflowOperationException(e);
         }
-        audioTrack = (Track) MediaPackageElementParser.getFromXml(job.getPayload());
-      } catch (EncoderException | MediaPackageException e) {
-        throw new WorkflowOperationException(String.format("Extracting audio for transcription failed for the track %s",
-            track.getURI()), e);
       }
-      try {
-        job = service.startTranscription(mediaPackage.getIdentifier().toString(), audioTrack, language);
-        // Only one job per media package
-        break;
-      } catch (TranscriptionServiceException e) {
-        deleteTrack(audioTrack);
-        throw new WorkflowOperationException(e);
-      }
-    }
-    // Wait for the jobs to return
-    if (!waitForStatus(job).isSuccess()) {
+    } finally {
+      // We do not need the audio file anymore, delete it...
       deleteTrack(audioTrack);
-      throw new WorkflowOperationException("Transcription job did not complete successfully.");
     }
-    // Return OK means that the transcription job was created, but not finished yet
-    logger.debug("External transcription job for media package '{}' was created.", mediaPackage.getIdentifier());
-    // We do not need the audio file anymore, delete it...
-    deleteTrack(audioTrack);
     // Results are empty, we should get a callback when transcription is done
     return createResult(Action.CONTINUE);
   }
