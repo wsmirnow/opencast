@@ -14,23 +14,13 @@
   <operations>
 
     <operation
-        id="encode"
-        exception-handler-workflow="partial-error"
-        description="Encoding videos to audio only format for transcription">
-      <configurations>
-        <configuration key="source-flavor">*/source</configuration>
-        <configuration key="target-flavor">*/audio</configuration>
-        <configuration key="encoding-profile">transcription-azure.audio</configuration>
-      </configurations>
-    </operation>
-
-    <operation
         id="microsoft-azure-start-transcription"
         exception-handler-workflow="partial-error"
         description="Start transcription">
       <configurations>
         <configuration key="source-flavor">*/audio</configuration>
         <!--configuration key="skip-if-flavor-exists">captions/vtt, captions/vtt+de, captions/vtt+en</configuration-->
+        <configuration key="audio-extraction-encoding-profile">transcription-azure.audio</configuration>
       </configurations>
     </operation>
 

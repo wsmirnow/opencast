@@ -20,10 +20,15 @@
  */
 package org.opencastproject.transcription.workflowoperation;
 
+import org.opencastproject.composer.api.ComposerService;
+import org.opencastproject.composer.api.EncoderException;
+import org.opencastproject.composer.api.EncodingProfile;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.job.api.JobContext;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElementFlavor;
+import org.opencastproject.mediapackage.MediaPackageElementParser;
+import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.mediapackage.selector.AbstractMediaPackageElementSelector;
 import org.opencastproject.mediapackage.selector.SimpleElementSelector;
@@ -31,6 +36,7 @@ import org.opencastproject.mediapackage.selector.TrackSelector;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.transcription.api.TranscriptionService;
 import org.opencastproject.transcription.api.TranscriptionServiceException;
+import org.opencastproject.util.NotFoundException;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
 import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
@@ -39,6 +45,7 @@ import org.opencastproject.workflow.api.WorkflowOperationHandler;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
 import org.opencastproject.workflow.api.WorkflowOperationResult;
 import org.opencastproject.workflow.api.WorkflowOperationResult.Action;
+import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.ComponentContext;
@@ -48,6 +55,7 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.SortedMap;
@@ -57,7 +65,7 @@ import java.util.TreeMap;
     immediate = true,
     service = WorkflowOperationHandler.class,
     property = {
-        "service.description=Start Transcription Workflow Operation Handler (Amberscript)",
+        "service.description=Start Transcription Workflow Operation Handler (Microsoft Azure)",
         "workflow.operation=microsoft-azure-start-transcription"
     }
 )
@@ -66,24 +74,33 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
   private static final Logger logger = LoggerFactory.getLogger(MicrosoftAzureStartTranscriptionOperationHandler.class);
 
   /** Workflow configuration option keys */
-  static final String SOURCE_FLAVOR = "source-flavor";
-  static final String SOURCE_TAG = "source-tag";
-  static final String LANGUAGE = "language";
-  static final String SKIP_IF_FLAVOR_EXISTS = "skip-if-flavor-exists";
+  static final String SOURCE_FLAVORS_KEY = "source-flavors";
+  static final String SOURCE_TAG_KEY = "source-tag";
+  static final String LANGUAGE_KEY = "language";
+  static final String SKIP_IF_FLAVOR_EXISTS_KEY = "skip-if-flavor-exists";
+  static final String EXTRACT_AUDIO_ENCODING_PROFILE_KEY = "audio-extraction-encoding-profile";
+  private static final String DEFAULT_EXTRACT_AUDIO_ENCODING_PROFILE = "transcription-azure.audio";
 
   /** The transcription service */
   private TranscriptionService service = null;
+  /** The composer service. */
+  private ComposerService composerService;
+  /** The workspace. */
+  private Workspace workspace;
 
   /** The configuration options for this handler */
   private static final SortedMap<String, String> CONFIG_OPTIONS;
 
   static {
     CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put(SOURCE_FLAVOR, "The \"flavor\" of the track to use as audio input");
-    CONFIG_OPTIONS.put(SOURCE_TAG, "The \"tag\" of the track to use as audio input");
-    CONFIG_OPTIONS.put(LANGUAGE, "The \"language\" the transcription service will use");
-    CONFIG_OPTIONS.put(SKIP_IF_FLAVOR_EXISTS,
-        "If this \"flavor\" is already in the media package, skip this operation");
+    CONFIG_OPTIONS.put(SOURCE_FLAVORS_KEY, "The \"flavors\" of the tracks to use as audio input. "
+        + "Only the first available track will be used.");
+    CONFIG_OPTIONS.put(SOURCE_TAG_KEY, "The \"tags\" of the track to use as audio input.");
+    CONFIG_OPTIONS.put(LANGUAGE_KEY, "The \"language\" the transcription service will use.");
+    CONFIG_OPTIONS.put(SKIP_IF_FLAVOR_EXISTS_KEY,
+        "If this \"flavor\" is already in the media package, skip this operation.");
+    CONFIG_OPTIONS.put(EXTRACT_AUDIO_ENCODING_PROFILE_KEY,
+        "The encoding profile to extract audio for transcription.");
   }
 
   @Override
@@ -98,7 +115,7 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
     MediaPackage mediaPackage = workflowInstance.getMediaPackage();
     WorkflowOperationInstance operation = workflowInstance.getCurrentOperation();
 
-    String skipOption = StringUtils.trimToNull(operation.getConfiguration(SKIP_IF_FLAVOR_EXISTS));
+    String skipOption = StringUtils.trimToNull(operation.getConfiguration(SKIP_IF_FLAVOR_EXISTS_KEY));
     if (skipOption != null) {
       SimpleElementSelector elementSelector = new SimpleElementSelector();
       for (String flavorStr : StringUtils.split(skipOption, ",")) {
@@ -114,6 +131,10 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
         return createResult(Action.SKIP);
       }
     }
+    String encodingProfile = StringUtils.trimToNull(operation.getConfiguration(EXTRACT_AUDIO_ENCODING_PROFILE_KEY));
+    if (encodingProfile == null) {
+      encodingProfile = DEFAULT_EXTRACT_AUDIO_ENCODING_PROFILE;
+    }
 
     logger.debug("Start transcription for media package '{}'.", mediaPackage.getIdentifier());
 
@@ -122,7 +143,7 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
         workflowInstance, Configuration.many, Configuration.many, Configuration.none, Configuration.none);
     List<String> sourceTagOption = tagsAndFlavors.getSrcTags();
     List<MediaPackageElementFlavor> sourceFlavorOption = tagsAndFlavors.getSrcFlavors();
-    String language = StringUtils.trimToEmpty(operation.getConfiguration(LANGUAGE));
+    String language = StringUtils.trimToEmpty(operation.getConfiguration(LANGUAGE_KEY));
 
     AbstractMediaPackageElementSelector<Track> elementSelector = new TrackSelector();
 
@@ -140,26 +161,55 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
 
     Collection<Track> elements = elementSelector.select(mediaPackage, false);
     Job job = null;
+    Track audioTrack = null;
     for (Track track : elements) {
       try {
-        job = service.startTranscription(mediaPackage.getIdentifier().toString(), track, language);
+        EncodingProfile profile = composerService.getProfile(encodingProfile);
+        if (profile == null) {
+          throw new WorkflowOperationException("Encoding profile '" + encodingProfile + "' was not found.");
+        }
+        Job encodeJob = composerService.encode(track, encodingProfile);
+        if (!waitForStatus(encodeJob).isSuccess()) {
+          throw new WorkflowOperationException(String.format(
+              "Audio extraction job for track %s did not complete successfully.", track.getURI()));
+        }
+        audioTrack = (Track) MediaPackageElementParser.getFromXml(job.getPayload());
+      } catch (EncoderException | MediaPackageException e) {
+        throw new WorkflowOperationException(String.format("Extracting audio for transcription failed for the track %s",
+            track.getURI()), e);
+      }
+      try {
+        job = service.startTranscription(mediaPackage.getIdentifier().toString(), audioTrack, language);
         // Only one job per media package
         break;
       } catch (TranscriptionServiceException e) {
+        deleteTrack(audioTrack);
         throw new WorkflowOperationException(e);
       }
     }
-
     // Wait for the jobs to return
     if (!waitForStatus(job).isSuccess()) {
+      deleteTrack(audioTrack);
       throw new WorkflowOperationException("Transcription job did not complete successfully.");
     }
     // Return OK means that the transcription job was created, but not finished yet
-
     logger.debug("External transcription job for media package '{}' was created.", mediaPackage.getIdentifier());
-
+    // We do not need the audio file anymore, delete it...
+    deleteTrack(audioTrack);
     // Results are empty, we should get a callback when transcription is done
     return createResult(Action.CONTINUE);
+  }
+
+  protected void deleteTrack(Track track) {
+    if (track != null && track.getURI() != null) {
+      try {
+        workspace.delete(track.getURI());
+      } catch (NotFoundException ex) {
+        // do nothing
+      } catch (IOException ex) {
+        logger.warn("Unable to delete file {}", track.getURI());
+      }
+    }
   }
 
   @Reference(target = "(provider=microsoft.azure)")
@@ -173,4 +223,13 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
     super.setServiceRegistry(serviceRegistry);
   }
 
+  @Reference
+  public void setComposerService(ComposerService composerService) {
+    this.composerService = composerService;
+  }
+
+  @Reference
+  public void setWorkspace(Workspace workspace) {
+    this.workspace = workspace;
+  }
 }
