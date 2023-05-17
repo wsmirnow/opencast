@@ -75,7 +75,7 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
 
   /** Workflow configuration option keys */
   static final String SOURCE_FLAVORS_KEY = "source-flavors";
-  static final String SOURCE_TAG_KEY = "source-tag";
+  static final String SOURCE_TAG_KEY = "source-tags";
   static final String LANGUAGE_KEY = "language";
   static final String SKIP_IF_FLAVOR_EXISTS_KEY = "skip-if-flavor-exists";
   static final String EXTRACT_AUDIO_ENCODING_PROFILE_KEY = "audio-extraction-encoding-profile";
@@ -122,7 +122,8 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
         if (StringUtils.trimToNull(flavorStr) == null) {
           continue;
         }
-        MediaPackageElementFlavor skipFlavor = MediaPackageElementFlavor.parseFlavor(flavorStr);
+        MediaPackageElementFlavor skipFlavor = MediaPackageElementFlavor.parseFlavor(
+            StringUtils.trimToEmpty(flavorStr));
         elementSelector.addFlavor(skipFlavor);
       }
       if (!elementSelector.select(mediaPackage, false).isEmpty()) {
@@ -135,31 +136,34 @@ public class MicrosoftAzureStartTranscriptionOperationHandler extends AbstractWo
     if (encodingProfile == null) {
       encodingProfile = DEFAULT_EXTRACT_AUDIO_ENCODING_PROFILE;
     }
-
-    logger.debug("Start transcription for media package '{}'.", mediaPackage.getIdentifier());
-
     // Check which tags have been configured
     ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(
         workflowInstance, Configuration.many, Configuration.many, Configuration.none, Configuration.none);
-    List<String> sourceTagOption = tagsAndFlavors.getSrcTags();
-    List<MediaPackageElementFlavor> sourceFlavorOption = tagsAndFlavors.getSrcFlavors();
+    List<MediaPackageElementFlavor> sourceFlavorsOption = tagsAndFlavors.getSrcFlavors();
+    List<String> sourceTagsOption = tagsAndFlavors.getSrcTags();
     String language = StringUtils.trimToEmpty(operation.getConfiguration(LANGUAGE_KEY));
-
     AbstractMediaPackageElementSelector<Track> elementSelector = new TrackSelector();
-
     // Make sure either one of tags or flavors are provided
-    if (sourceTagOption.isEmpty() && sourceFlavorOption.isEmpty()) {
+    if (sourceTagsOption.isEmpty() && sourceFlavorsOption.isEmpty()) {
       throw new WorkflowOperationException("No source tag or flavor have been specified!");
     }
-
-    if (!sourceFlavorOption.isEmpty()) {
-      elementSelector.addFlavor(sourceFlavorOption.get(0));
+    if (!sourceFlavorsOption.isEmpty()) {
+      for (MediaPackageElementFlavor srcFlavor : sourceFlavorsOption) {
+        elementSelector.addFlavor(srcFlavor);
+      }
     }
-    if (!sourceTagOption.isEmpty()) {
-      elementSelector.addTag(sourceTagOption.get(0));
+    if (!sourceTagsOption.isEmpty()) {
+      for (String srcTag : sourceTagsOption) {
+        elementSelector.addTag(StringUtils.trimToEmpty(srcTag));
+      }
     }
-
     Collection<Track> elements = elementSelector.select(mediaPackage, false);
+    if (elements.isEmpty()) {
+      logger.info("Media package {} does not contain elements to transcribe. Skip operation.",
+          mediaPackage.getIdentifier());
+      return createResult(Action.SKIP);
+    }
+    logger.info("Start transcription for media package '{}'.", mediaPackage.getIdentifier());
     Track audioTrack = null;
     try {
       for (Track track : elements) {
