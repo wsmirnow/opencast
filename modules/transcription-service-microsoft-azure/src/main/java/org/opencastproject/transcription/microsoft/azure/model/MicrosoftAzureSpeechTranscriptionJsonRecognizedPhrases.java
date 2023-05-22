@@ -100,10 +100,19 @@ public class MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrases {
     if (nBest == null) {
       return null;
     }
-    Optional<MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrase> bestPhrase = nBest.stream()
-        .filter(phrase -> phrase.confidence >= minConfidence)
-        .sorted((t1, t2) -> Float.compare(t2.confidence, t1.confidence))  // descendant order
-        .findFirst();
+    Optional<MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrase> bestPhrase;
+    if (minConfidence >= 0 && minConfidence < 1) {
+      bestPhrase = nBest.stream()
+          .filter(phrase -> phrase.confidence >= minConfidence)
+          .sorted((t1, t2) -> Float.compare(t2.confidence, t1.confidence))  // descendant order
+          .findFirst();
+    } else if (minConfidence >= 1) {
+      bestPhrase = nBest.stream().findFirst();
+    } else {
+      bestPhrase = nBest.stream()
+          .sorted((t1, t2) -> Float.compare(t2.confidence, t1.confidence))  // descendant order
+          .findFirst();
+    }
     return bestPhrase.isPresent() ? bestPhrase.get().display : "";
   }
 
