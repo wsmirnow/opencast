@@ -23,6 +23,7 @@ package org.opencastproject.transcription.microsoft.azure.model;
 import org.apache.commons.lang3.StringUtils;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -45,31 +46,26 @@ public class MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrases {
   public long offsetInTicks;
   public long durationInTicks;
   public List<MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrase> nBest;
+  public String locale;
 
   // CHECKSTYLE:ON checkstyle:VisibilityModifier
 
   public MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrases() { }
 
-  public String toSrt(float minConfidence) {
+  public String[] toSrt(float minConfidence, int maxCueLength) {
     String text = getBestRecognizedText(minConfidence);
-    if (StringUtils.isNotBlank(text)) {
-      return String.format("%s\n%s\n", getSegmentTimestamp(false), text);
-    }
-    return "";
+    String[] cueText = splitCueText(text, maxCueLength);
+    return timestampCues(false, cueText);
   }
 
-  public String toWebVtt(float minConfidence) {
+  public String[] toWebVtt(float minConfidence, int maxCueLength) {
     String text = getBestRecognizedText(minConfidence);
-    if (StringUtils.isNotBlank(text)) {
-      return String.format("%s\n%s\n", getSegmentTimestamp(true), text);
-    }
-    return "";
+    String[] cueText = splitCueText(text, maxCueLength);
+    return timestampCues(true, cueText);
   }
 
-  String getSegmentTimestamp(boolean formatWebVtt) {
+  String[] timestampCues(boolean formatWebVtt, String[] cueText) {
     long ticksPerMillisecond = 10000;
-    Date startTime = new Date(offsetInTicks / ticksPerMillisecond);
-    Date endTime = new Date((offsetInTicks + durationInTicks) / ticksPerMillisecond);
     String format;
     if (formatWebVtt) {
       format = "HH:mm:ss.SSS";
@@ -80,7 +76,24 @@ public class MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrases {
     SimpleDateFormat formatter = new SimpleDateFormat(format);
     // If we don't do this, the time is adjusted for our local time zone, which we don't want.
     formatter.setTimeZone(TimeZone.getTimeZone("GMT"));
-    return String.format("%s --> %s", formatter.format(startTime), formatter.format(endTime));
+    int cueTextLength = 0;
+    int[] cuesTextLenth = new int[cueText.length];
+    for (int i = 0; i < cueText.length; i++) {
+      cuesTextLenth[i] = StringUtils.length(cueText[i]);
+      cueTextLength += cuesTextLenth[i];
+    }
+    String[] result = new String[cueText.length];
+    long cueOffsetInTicks = 0;
+    for (int i = 0; i < cueText.length; i++) {
+      long cueLengthInTicks = (long)Math.ceil((double)durationInTicks * (double)cuesTextLenth[i]
+          / (double)cueTextLength);
+
+      Date startTime = new Date((offsetInTicks + cueOffsetInTicks) / ticksPerMillisecond);
+      Date endTime = new Date((offsetInTicks  + cueOffsetInTicks + cueLengthInTicks) / ticksPerMillisecond);
+      cueOffsetInTicks += cueLengthInTicks;
+      result[i] = String.format("%s --> %s\n%s\n", formatter.format(startTime), formatter.format(endTime), cueText[i]);
+    }
+    return result;
   }
 
   public String getBestRecognizedText(float minConfidence) {
@@ -92,5 +105,29 @@ public class MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrases {
         .sorted((t1, t2) -> Float.compare(t2.confidence, t1.confidence))  // descendant order
         .findFirst();
     return bestPhrase.isPresent() ? bestPhrase.get().display : "";
+  }
+
+  public static String[] splitCueText(String text, int maxCueLength) {
+    int textLength = StringUtils.length(text);
+    if (textLength == 0) {
+      return new String[0];
+    } else if (textLength <= maxCueLength) {
+      return new String[] { text };
+    }
+    List<String> result = new ArrayList<>();
+    int start = 0;
+    do {
+      if (textLength - start <= maxCueLength) {
+        result.add(StringUtils.trimToEmpty(StringUtils.substring(text, start, textLength)));
+        break;
+      }
+      int end = StringUtils.lastIndexOf(text, " ", start + maxCueLength);
+      if (start >= end) {
+        end = Math.min(textLength, start + maxCueLength);
+      }
+      result.add(StringUtils.trimToEmpty(StringUtils.substring(text, start, end)));
+      start = end;
+    } while (start < textLength);
+    return result.toArray(new String[0]);
   }
 }

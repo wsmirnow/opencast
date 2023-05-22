@@ -22,8 +22,10 @@ package org.opencastproject.transcription.microsoft.azure.model;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class MicrosoftAzureSpeechTranscriptionJson {
 
@@ -46,27 +48,56 @@ public class MicrosoftAzureSpeechTranscriptionJson {
 
   public MicrosoftAzureSpeechTranscriptionJson() { }
 
-  public String toSrt(float minConfidence) {
+  public String toSrt(float minConfidence, int maxCueLength) {
     StringBuilder sb = new StringBuilder();
     long segmentIndex = 1;
     for (MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrases phrase : recognizedPhrases) {
-      String segment = phrase.toWebVtt(minConfidence);
-      if (StringUtils.isNotBlank(segment)) {
-        sb.append(String.format("\n%d\n", segmentIndex++)).append(segment);
+      String[] cues = phrase.toSrt(minConfidence, maxCueLength);
+      if (cues != null) {
+        for (String cue : cues) {
+          sb.append(String.format("\n%d\n", segmentIndex++)).append(cue);
+        }
       }
     }
     return sb.toString();
   }
 
-  public String toWebVtt(float minConfidence) {
+  public String toWebVtt(float minConfidence, int maxCueLength) {
     StringBuilder sb = new StringBuilder();
     sb.append("WEBVTT\n");
     for (MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrases phrase : recognizedPhrases) {
-      String segment = phrase.toWebVtt(minConfidence);
-      if (StringUtils.isNotBlank(segment)) {
-        sb.append("\n").append(segment);
+      String[] cues = phrase.toWebVtt(minConfidence, maxCueLength);
+      if (cues != null) {
+        for (String cue : cues) {
+          if (StringUtils.isNotBlank(cue)) {
+            sb.append("\n");
+            sb.append(cue);
+          }
+        }
       }
     }
     return sb.toString();
+  }
+
+  public Map<String, Float> getRecognizedLocales() {
+    Map<String, Long> localeDurations = new HashMap<>();
+    for (MicrosoftAzureSpeechTranscriptionJsonRecognizedPhrases recognizedPhrase : recognizedPhrases) {
+      if (StringUtils.isNotBlank(recognizedPhrase.locale)) {
+        localeDurations.put(recognizedPhrase.locale,
+            localeDurations.getOrDefault(recognizedPhrase.locale, 0L) + recognizedPhrase.durationInTicks);
+      }
+    }
+    Map<String, Float> relativeLocaleDurations = new HashMap<>();
+    for (Map.Entry<String, Long> localeDuration : localeDurations.entrySet()) {
+      relativeLocaleDurations.put(localeDuration.getKey(),
+          localeDuration.getValue().floatValue() / Long.valueOf(durationInTicks).floatValue());
+    }
+    return relativeLocaleDurations;
+  }
+
+  public String getRecognizedLocale() {
+    Optional<Map.Entry<String, Float>> localeOpt = getRecognizedLocales().entrySet().stream()
+        .max(Map.Entry.comparingByValue());
+    return localeOpt.isPresent() ? localeOpt.get().getKey() : "";
   }
 }

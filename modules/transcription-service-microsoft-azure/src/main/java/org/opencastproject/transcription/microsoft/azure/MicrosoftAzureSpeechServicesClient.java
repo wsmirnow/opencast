@@ -251,28 +251,10 @@ public class MicrosoftAzureSpeechServicesClient {
     }
   }
 
-  public static URI getTranscriptionFile(MicrosoftAzureSpeechTranscriptionFile transcriptionFile, Workspace workspace,
-      String format, float minConfidence)
+  public static MicrosoftAzureSpeechTranscriptionJson getTranscriptionJson(
+      MicrosoftAzureSpeechTranscriptionFile transcriptionFile)
           throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureSpeechClientException {
-    boolean formatIsWebVtt;
-    switch (StringUtils.lowerCase(format)) {
-      case "vtt":
-      case "webvtt":
-        formatIsWebVtt = true;
-        break;
-      case "srt":
-        formatIsWebVtt = false;
-        break;
-      default:
-        throw new IllegalArgumentException("format should be srt, vtt or webvtt");
-    }
     String transcriptionUrl = transcriptionFile.links.contentUrl;
-    String fileName = transcriptionFile.name;
-    if (formatIsWebVtt) {
-      fileName = "captions.vtt";
-    } else {
-      fileName = "captions.srt";
-    }
     MicrosoftAzureSpeechTranscriptionJson transcriptionJson;
     try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
       HttpGet httpGet = new HttpGet(transcriptionUrl);
@@ -292,17 +274,39 @@ public class MicrosoftAzureSpeechServicesClient {
                 "Getting transcription file '%s' failed with HTTP response code %d. "
                     + "Microsoft Azure Speech Services response: %s", transcriptionUrl, code, responseString));
         }
-        transcriptionJson = gson.fromJson(responseString, MicrosoftAzureSpeechTranscriptionJson.class);
+        return gson.fromJson(responseString, MicrosoftAzureSpeechTranscriptionJson.class);
       }
-      String content = "";
-      if (formatIsWebVtt) {
-        content = transcriptionJson.toWebVtt(minConfidence);
-      } else {
-        content = transcriptionJson.toSrt(minConfidence);
-      }
-      try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
-        return workspace.putInCollection(WORKSPACE_COLLECTION, fileName, is);
-      }
+    }
+  }
+
+  public static URI writeTranscriptionFile(MicrosoftAzureSpeechTranscriptionJson transcriptionJson,
+      Workspace workspace, String format, float minConfidence, int maxCueLength) throws IOException {
+    boolean formatIsWebVtt;
+    switch (StringUtils.lowerCase(format)) {
+      case "vtt":
+      case "webvtt":
+        formatIsWebVtt = true;
+        break;
+      case "srt":
+        formatIsWebVtt = false;
+        break;
+      default:
+        throw new IllegalArgumentException("format should be srt, vtt or webvtt");
+    }
+    String content;
+    if (formatIsWebVtt) {
+      content = transcriptionJson.toWebVtt(minConfidence, maxCueLength);
+    } else {
+      content = transcriptionJson.toSrt(minConfidence, maxCueLength);
+    }
+    String fileName;
+    if (formatIsWebVtt) {
+      fileName = "captions.vtt";
+    } else {
+      fileName = "captions.srt";
+    }
+    try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
+      return workspace.putInCollection(WORKSPACE_COLLECTION, fileName, is);
     }
   }
 }

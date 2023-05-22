@@ -50,7 +50,7 @@
         exception-handler-workflow="partial-error"
         description="Publish transcription to engage player">
       <configurations>
-        <configuration key="download-source-flavors">captions/vtt${transcriptionLanguageSubtypeSuffix}</configuration>
+        <configuration key="download-source-flavors">captions/vtt${transcriptionLocaleSubtypeSuffix}</configuration>
         <configuration key="check-availability">true</configuration>
         <configuration key="strategy">merge</configuration>
       </configurations>
