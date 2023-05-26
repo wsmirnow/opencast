@@ -117,6 +117,7 @@ public class MicrosoftAzureStorageClientTest {
     Assert.assertTrue("Azure storage blob URL should end with /opencast-transcriptions/test.txt",
         StringUtils.endsWithIgnoreCase(blobUrl, "/opencast-transcriptions/test.txt"));
   }
+
   @Test
   public void uploadFile2()
           throws MicrosoftAzureStorageClientException, MicrosoftAzureNotAllowedException, IOException,
@@ -129,5 +130,19 @@ public class MicrosoftAzureStorageClientTest {
     String blobUrl = azureStorageClient.uploadFile(testFile, "opencast-transcriptions", null, "test.ogg");
     Assert.assertTrue("Azure storage blob URL should end with /opencast-transcriptions/test.txt",
         StringUtils.endsWithIgnoreCase(blobUrl, "/opencast-transcriptions/test.ogg"));
+  }
+
+  @Test
+  public void deleteFile()
+          throws MicrosoftAzureStorageClientException, MicrosoftAzureNotAllowedException, IOException,
+          URISyntaxException {
+    if (!enabled) {
+      return;
+    }
+    URL testFileUrl = MicrosoftAzureStorageClientTest.class.getResource("/test.txt");
+    File testFile = new File(testFileUrl.toURI());
+    String blobUrl = azureStorageClient.uploadFile(testFile, "opencast-transcriptions", null, "test.txt");
+    Assert.assertNotNull(blobUrl);
+    azureStorageClient.deleteFile(new URL(blobUrl));
   }
 }

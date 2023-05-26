@@ -52,7 +52,10 @@ public final class HttpUtils {
   }
 
   public static String formatResponseErrorString(HttpResponse response, String message) throws IOException {
-    String responseString = EntityUtils.toString(response.getEntity());
+    String responseString = "";
+    if (response.getEntity() != null) {
+      responseString = EntityUtils.toString(response.getEntity());
+    }
     if (StringUtils.isNotBlank(message)) {
       return String.format("%s Microsoft response: %s", message, responseString);
     } else {

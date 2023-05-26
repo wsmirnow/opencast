@@ -31,8 +31,9 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -42,9 +43,6 @@ import javax.crypto.Mac;
 public class MicrosoftAzureAuthorization {
 
   private static final Logger logger = LoggerFactory.getLogger(MicrosoftAzureStorageClient.class);
-
-  public static final long MILLIS_IN_A_DAY = 1000 * 60 * 60 * 24;
-  public static final long MILLIS_IN_A_MINUTE = 1000 * 60;
   public static final String AZURE_STORAGE_VERSION = "2022-11-02";
   public static final String AZURE_BLOB_STORE_URL_SUFFIX = "blob.core.windows.net";
 
@@ -93,22 +91,18 @@ public class MicrosoftAzureAuthorization {
     queryArgs.add("ss=b");
     stringBuilder.append(StringUtils.trimToEmpty(signedResourceType) + "\n");
     queryArgs.add("srt=" + StringUtils.trimToEmpty(signedResourceType));
-    if (signedStart == null) {
-      Date startDate = new Date(Calendar.getInstance().getTimeInMillis() + (-15 * MILLIS_IN_A_MINUTE));
-      stringBuilder.append(df.format(startDate) + "\n");
-      queryArgs.add("st=" + df.format(startDate));
-    } else {
-      stringBuilder.append(df.format(signedStart) + "\n");
-      queryArgs.add("st=" + df.format(signedStart));
+    Date startDate = signedStart;
+    if (startDate == null) {
+      startDate = Date.from(Instant.now().minus(15, ChronoUnit.MINUTES));
     }
-    if (signedExpiry == null) {
-      Date endDate = new Date(Calendar.getInstance().getTimeInMillis() + (1 * MILLIS_IN_A_DAY));
-      stringBuilder.append(df.format(endDate) + "\n");
-      queryArgs.add("se=" + df.format(endDate));
-    } else {
-      stringBuilder.append(df.format(signedExpiry) + "\n");
-      queryArgs.add("se=" + df.format(signedExpiry));
+    stringBuilder.append(df.format(startDate) + "\n");
+    queryArgs.add("st=" + df.format(startDate));
+    Date endDate = signedExpiry;
+    if (endDate == null) {
+      endDate = Date.from(Instant.now().plus(1, ChronoUnit.DAYS));
     }
+    stringBuilder.append(df.format(endDate) + "\n");
+    queryArgs.add("se=" + df.format(endDate));
     stringBuilder.append(StringUtils.trimToEmpty(signedIP) + "\n");
     if (StringUtils.isNotBlank(signedIP)) {
       queryArgs.add("sip=" + StringUtils.trimToEmpty(signedIP));
@@ -169,23 +163,19 @@ public class MicrosoftAzureAuthorization {
     stringBuilder.append(StringUtils.trimToEmpty(signedPermissions) + "\n");
     queryArgs.add("sp=" + StringUtils.trimToEmpty(signedPermissions));
     //    signedStart (st)
-    if (signedStart == null) {
-      Date startDate = new Date(Calendar.getInstance().getTimeInMillis() + (-15 * MILLIS_IN_A_MINUTE));
-      stringBuilder.append(df.format(startDate) + "\n");
-      queryArgs.add("st=" + df.format(startDate));
-    } else {
-      stringBuilder.append(df.format(signedStart) + "\n");
-      queryArgs.add("st=" + df.format(signedStart));
+    Date startDate = signedStart;
+    if (startDate == null) {
+      startDate = Date.from(Instant.now().minus(15, ChronoUnit.MINUTES));
     }
+    stringBuilder.append(df.format(startDate) + "\n");
+    queryArgs.add("st=" + df.format(startDate));
     //    signedExpiry (se)
-    if (signedExpiry == null) {
-      Date endDate = new Date(Calendar.getInstance().getTimeInMillis() + (1 * MILLIS_IN_A_DAY));
-      stringBuilder.append(df.format(endDate) + "\n");
-      queryArgs.add("se=" + df.format(endDate));
-    } else {
-      stringBuilder.append(df.format(signedExpiry) + "\n");
-      queryArgs.add("se=" + df.format(signedExpiry));
+    Date endDate = signedExpiry;
+    if (endDate == null) {
+      endDate = Date.from(Instant.now().plus(1, ChronoUnit.DAYS));
     }
+    stringBuilder.append(df.format(endDate) + "\n");
+    queryArgs.add("se=" + df.format(endDate));
     //    canonicalizedResource ()
     String canonicalizedResource = Paths.get("/blob", azureStorageAccountName, StringUtils.trimToEmpty(resource))
         .normalize().toString();
@@ -253,7 +243,7 @@ public class MicrosoftAzureAuthorization {
       queryArgs.add("rscl=" + StringUtils.trimToEmpty(rscl));
     }
     //    rsct = Content-Type (rsct)
-    stringBuilder.append(StringUtils.trimToEmpty(rsct) + "\n");
+    stringBuilder.append(StringUtils.trimToEmpty(rsct));
     if (StringUtils.isNotBlank(rsct)) {
       queryArgs.add("rsct=" + StringUtils.trimToEmpty(rsct));
     }
@@ -314,23 +304,19 @@ public class MicrosoftAzureAuthorization {
     stringBuilder.append(StringUtils.trimToEmpty(signedPermissions) + "\n");
     queryArgs.add("sp=" + StringUtils.trimToEmpty(signedPermissions));
     //    signedStart (st)
-    if (signedStart == null) {
-      Date startDate = new Date(Calendar.getInstance().getTimeInMillis() + (-15 * MILLIS_IN_A_MINUTE));
-      stringBuilder.append(df.format(startDate) + "\n");
-      queryArgs.add("st=" + df.format(startDate));
-    } else {
-      stringBuilder.append(df.format(signedStart) + "\n");
-      queryArgs.add("st=" + df.format(signedStart));
+    Date startDate = signedStart;
+    if (startDate == null) {
+      startDate = Date.from(Instant.now().minus(15, ChronoUnit.MINUTES));
     }
+    stringBuilder.append(df.format(startDate) + "\n");
+    queryArgs.add("st=" + df.format(startDate));
     //    signedExpiry (se)
-    if (signedExpiry == null) {
-      Date endDate = new Date(Calendar.getInstance().getTimeInMillis() + (1 * MILLIS_IN_A_DAY));
-      stringBuilder.append(df.format(endDate) + "\n");
-      queryArgs.add("se=" + df.format(endDate));
-    } else {
-      stringBuilder.append(df.format(signedExpiry) + "\n");
-      queryArgs.add("se=" + df.format(signedExpiry));
+    Date endDate = signedExpiry;
+    if (endDate == null) {
+      endDate = Date.from(Instant.now().plus(1, ChronoUnit.DAYS));
     }
+    stringBuilder.append(df.format(endDate) + "\n");
+    queryArgs.add("se=" + df.format(endDate));
     //    canonicalizedResource ()
     String canonicalizedResource = Paths.get("/blob", azureStorageAccountName, StringUtils.trimToEmpty(resource))
         .normalize().toString();

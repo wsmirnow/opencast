@@ -77,6 +77,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -405,7 +408,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       MicrosoftAzureSpeechTranscriptionJson transcriptionJson = getTranscriptionJson(mpId, transcription);
       transcriptionFileUri = MicrosoftAzureSpeechServicesClient.writeTranscriptionFile(transcriptionJson,
           workspace, "webvtt", azureSpeechRecognitionMinConfidence, splitTextLineLength);
-    } catch (IOException e) {
+    } catch (IOException | MicrosoftAzureNotFoundException e) {
       throw new TranscriptionServiceException(String.format(
           "Unable to download transcription file for media package '%s'.", mpId), e);
     }
@@ -417,6 +420,13 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   public void transcriptionDone(String mpId, Object results) throws TranscriptionServiceException {
     MicrosoftAzureSpeechTranscription transcription = (MicrosoftAzureSpeechTranscription) results;
     logger.info("Transcription job {} for media package {} done.", transcription.getID(), mpId);
+    // delete audio source files in Azure storage
+    try {
+      deleteTranscriptionSourceFiles(mpId, transcription.getID());
+    } catch (TranscriptionServiceException e) {
+      logger.warn("Unable to delete transcription source files for media package {} after transcription job done.",
+          mpId, e);
+    }
     try {
       database.updateJobControl(transcription.getID(), TranscriptionJobControl.Status.TranscriptionComplete.name());
     } catch (TranscriptionDatabaseException e) {
@@ -436,6 +446,13 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
           errorInfo.getOrDefault("message", "No info"));
     }
     logger.info("Transcription job {} for media package {} failed.{}", transcription.getID(), mpId, message);
+    // delete audio source files in Azure storage
+    try {
+      deleteTranscriptionSourceFiles(mpId, transcription.getID());
+    } catch (TranscriptionServiceException e) {
+      logger.warn("Unable to delete transcription source files for media package {} after transcription kob failure.",
+          mpId, e);
+    }
     try {
       database.updateJobControl(transcription.getID(), TranscriptionJobControl.Status.Error.name());
     } catch (TranscriptionDatabaseException e) {
@@ -517,7 +534,8 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
   }
 
   MicrosoftAzureSpeechTranscriptionJson getTranscriptionJson(String mpId,
-      MicrosoftAzureSpeechTranscription transcription) throws TranscriptionServiceException {
+      MicrosoftAzureSpeechTranscription transcription)
+          throws TranscriptionServiceException, MicrosoftAzureNotFoundException {
     if (!transcription.isSucceeded()) {
       if (transcription.isRunning()) {
         throw new TranscriptionServiceException(String.format("Unable to get generated transcription. "
@@ -549,11 +567,11 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
       throw new NotImplementedException("At least one transcription file should be provided.");
     }
 
-    URI transcriptionFileUri;
     try {
       return MicrosoftAzureSpeechServicesClient
           .getTranscriptionJson(transcriptionFile);
-    } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureSpeechClientException e) {
+    } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureSpeechClientException
+             | MicrosoftAzureNotFoundException e) {
       throw new TranscriptionServiceException(String.format(
           "Unable to download transcription file '%s' for media package '%s'.", transcriptionFile.self, mpId), e);
     }
@@ -561,7 +579,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
 
   String startWorkflow(String mpId, MicrosoftAzureSpeechTranscription transcription)
           throws TranscriptionDatabaseException, NotFoundException, WorkflowDatabaseException,
-          TranscriptionServiceException {
+          TranscriptionServiceException, MicrosoftAzureNotFoundException {
     MicrosoftAzureSpeechTranscriptionJson transcriptionJson = getTranscriptionJson(mpId, transcription);
     String transcriptionLocale = transcriptionJson.getRecognizedLocale();
 
@@ -613,6 +631,68 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     return wfList.size() > 0 ? Long.toString(wfList.get(0).getId()) : null;
   }
 
+  public void deleteTranscription(String mpId, String transcriptionId)
+          throws TranscriptionServiceException, TranscriptionDatabaseException {
+    TranscriptionJobControl transcriptionJobControl = database.findByJob(transcriptionId);
+    TranscriptionJobControl.Status transcriptionJobControlStatus = TranscriptionJobControl.Status.valueOf(
+        transcriptionJobControl.getStatus());
+    if (transcriptionJobControlStatus != TranscriptionJobControl.Status.Closed
+        && transcriptionJobControlStatus != TranscriptionJobControl.Status.Canceled
+        && transcriptionJobControlStatus != TranscriptionJobControl.Status.Error) {
+      throw new TranscriptionServiceException(String.format("Abort deleting transcription %s with invalid status '%s'.",
+          transcriptionId, transcriptionJobControl.getStatus()));
+    }
+    deleteTranscriptionSourceFiles(mpId, transcriptionId);
+    try {
+      azureSpeechServicesClient.deleteTranscription(transcriptionId);
+    } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureSpeechClientException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Unable to delete transcription '%s' for media package '%s'.", transcriptionId, mpId), e);
+    }
+    database.deleteJobControl(transcriptionJobControl.getTranscriptionJobId());
+  }
+
+  public void deleteTranscriptionSourceFiles(String mpId, String transcriptionId)
+          throws TranscriptionServiceException {
+    MicrosoftAzureSpeechTranscriptionFiles transcriptionFiles;
+    try {
+      transcriptionFiles = azureSpeechServicesClient.getTranscriptionFilesById(transcriptionId);
+    } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureSpeechClientException e) {
+      throw new TranscriptionServiceException(String.format(
+          "Unable to get for transcription '%s' from media package '%s'.", transcriptionId, mpId), e);
+    } catch (MicrosoftAzureNotFoundException e) {
+      // catch deleting non-existing file
+      logger.debug("Failed to get non existing transcription files from media package {} for deleting.", mpId, e);
+      return;
+    }
+    for (MicrosoftAzureSpeechTranscriptionFile transcriptionFile : transcriptionFiles.values) {
+      if (!transcriptionFile.isTranscriptionFile()) {
+        continue;
+      }
+      MicrosoftAzureSpeechTranscriptionJson transcriptionJson;
+      try {
+        transcriptionJson = MicrosoftAzureSpeechServicesClient
+            .getTranscriptionJson(transcriptionFile);
+      } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureSpeechClientException e) {
+        throw new TranscriptionServiceException(String.format(
+            "Unable to download transcription file '%s' for media package '%s'.", transcriptionFile.self, mpId), e);
+      } catch (MicrosoftAzureNotFoundException e) {
+        // catch deleting non-existing file
+        logger.debug("Failed to get non existing transcription file {} from media package {} for deleting.",
+            transcriptionFile.self, mpId, e);
+        continue;
+      }
+      if (StringUtils.isNotBlank(transcriptionJson.source)) {
+        try {
+          azureStorageClient.deleteFile(new URL(transcriptionJson.source));
+        } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureStorageClientException e) {
+          throw new TranscriptionServiceException(String.format(
+              "Unable to delete audio source file for media package %s.", mpId, e));
+        }
+      }
+    }
+  }
+
   class WorkflowDispatcher implements Runnable {
 
     @Override
@@ -621,6 +701,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
         logger.debug("Service disabled, cancel processing.");
         return;
       }
+      logger.debug("Run jobs handling loop for transcription provider {}.", PROVIDER);
       long providerId;
       try {
         TranscriptionProviderControl providerInfo = database.findIdByProvider(PROVIDER);
@@ -637,15 +718,23 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
             continue;
           }
           String mpId = jobControl.getMediaPackageId();
-          String jobId = jobControl.getTranscriptionJobId();
-          MicrosoftAzureSpeechTranscription transcription = azureSpeechServicesClient.getTranscriptionById(jobId);
-          // check and update job status
-          if (!transcription.isRunning()) {
-            if (transcription.isFailed()) {
-              transcriptionError(mpId, transcription);
-            } else if (transcription.isSucceeded()) {
-              transcriptionDone(mpId, transcription);
+          String transcriptionId = jobControl.getTranscriptionJobId();
+          try {
+            MicrosoftAzureSpeechTranscription transcription = azureSpeechServicesClient.getTranscriptionById(
+                transcriptionId);
+            // check and update job status
+            if (!transcription.isRunning()) {
+              if (transcription.isFailed()) {
+                transcriptionError(mpId, transcription);
+              } else if (transcription.isSucceeded()) {
+                transcriptionDone(mpId, transcription);
+              }
             }
+          } catch (MicrosoftAzureNotAllowedException | IOException | MicrosoftAzureSpeechClientException e) {
+            logger.error("Unable to get or update transcription {} or transcription file from media package {}.",
+                transcriptionId, mpId, e);
+          } catch (TranscriptionServiceException e) {
+            logger.error(e.getMessage(), e);
           }
         }
         // handle completed jobs
@@ -656,27 +745,51 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
           }
           String mpId = jobControl.getMediaPackageId();
           String transcriptionId = jobControl.getTranscriptionJobId();
-          MicrosoftAzureSpeechTranscription transcription = azureSpeechServicesClient.getTranscriptionById(
-              transcriptionId);
-          // start workflow
-          String workflowId = startWorkflow(mpId, transcription);
-          // update db
-          if (workflowId != null) {
-            database.updateJobControl(transcriptionId, TranscriptionJobControl.Status.Closed.name());
-            logger.info("Attach transcription workflow {} scheduled for mp {}, microsoft azure transcription job {}",
-                workflowId, mpId, transcriptionId);
+          try {
+            MicrosoftAzureSpeechTranscription transcription = azureSpeechServicesClient.getTranscriptionById(
+                transcriptionId);
+            // start workflow
+            String workflowId = startWorkflow(mpId, transcription);
+            // update db
+            if (workflowId != null) {
+              database.updateJobControl(transcriptionId, TranscriptionJobControl.Status.Closed.name());
+              logger.info("Attach transcription workflow {} scheduled for mp {}, microsoft azure transcription job {}",
+                  workflowId, mpId, transcriptionId);
+            }
+          } catch (MicrosoftAzureNotAllowedException | MicrosoftAzureNotFoundException | IOException
+                   | MicrosoftAzureSpeechClientException e) {
+            logger.warn("Unable to get transcription {} or transcription file from media package {}.",
+                transcriptionId, mpId, e);
+          } catch (TranscriptionServiceException e) {
+            logger.warn(e.getMessage(), e);
+          } catch (NotFoundException e) {
+            logger.warn("Unable to load organization.", e);
+          }
+        }
+        // cleanup all old jobs
+        for (TranscriptionJobControl jobControl : database.findByStatus(
+            TranscriptionJobControl.Status.Closed.name(), TranscriptionJobControl.Status.Error.name())) {
+          if (providerId != jobControl.getProviderId()) {
+            continue;
+          }
+          String mpId = jobControl.getMediaPackageId();
+          String transcriptionId = jobControl.getTranscriptionJobId();
+          if (Instant.now().minus(7, ChronoUnit.DAYS).isAfter(jobControl.getDateCreated().toInstant())) {
+            try {
+              deleteTranscription(jobControl.getMediaPackageId(), jobControl.getTranscriptionJobId());
+            } catch (TranscriptionServiceException e) {
+              logger.error("Unable to delete transcription {} or transcription files from media package {}.",
+                  transcriptionId, mpId, e);
+            }
           }
         }
       } catch (TranscriptionDatabaseException e) {
         logger.warn("Could not read or update transcription job control database", e);
-      } catch (MicrosoftAzureNotAllowedException | IOException | MicrosoftAzureSpeechClientException e) {
-        logger.warn("Unable to get transcription or transcription file", e);
-      } catch (TranscriptionServiceException e) {
-        logger.warn(e.getMessage(), e);
-      } catch (NotFoundException e) {
-        logger.warn("Unable to load organization.", e);
       } catch (WorkflowDatabaseException e) {
         logger.warn("Unable to get workflow definition.", e);
+      } catch (Throwable e) {
+        // catch all
+        logger.error("Something went wrong in transcription job processing loop. Exception unhandled!!!", e);
       }
     }
   }

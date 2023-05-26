@@ -25,6 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.ByteArrayEntity;
@@ -38,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -144,12 +146,9 @@ public class MicrosoftAzureStorageClient {
     String containerUrl = getContainerUrl(azureContainerName);
     String blobPath = Paths.get(StringUtils.trimToEmpty(azureBlobPath), StringUtils.trimToEmpty(azureBlobName))
         .normalize().toString();
-    String blobUrl = String.format("%s/%s",containerUrl, blobPath);
+    URL blobUrl = new URL(containerUrl + "/" + blobPath);
     int blockSize = 100000000; // 100MB
-    String sasToken = azureAuthorization.generateAccountSASToken("w", "o", null, null, null, null);
-//    String sasToken = azureAuthorization.generateUserDelegationSASToken("cw", null, null,
-//        String.format("/%s/%s", StringUtils.trimToEmpty(azureContainerName), blobPath), null, null, null, null, null,
-//        null, null, null, null, null, null, "b", null, null, null, null, null, null, null, null);
+    String sasToken = azureAuthorization.generateServiceSasToken("w", null, null, blobUrl.getPath(), "b");
     try (FileInputStream trackStream = new FileInputStream(trackFile)) {
       try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
         List<String> blockIds = new ArrayList<>();
@@ -174,7 +173,7 @@ public class MicrosoftAzureStorageClient {
               default:
                 throw new MicrosoftAzureStorageClientException(HttpUtils.formatResponseErrorString(response,
                     String.format("Putting block to Azure storage container %s failed with HTTP response code %d. ",
-                    azureContainerName, code)));
+                        azureContainerName, code)));
             }
           }
         }
@@ -209,6 +208,34 @@ public class MicrosoftAzureStorageClient {
         }
       }
     }
-    return blobUrl;
+    return blobUrl.toString();
+  }
+
+  public void deleteFile(URL fileUrl)
+          throws IOException, MicrosoftAzureNotAllowedException, MicrosoftAzureStorageClientException {
+    String sasToken = azureAuthorization.generateServiceSasToken("dy", null, null, fileUrl.getPath(), "b");
+    String deleteUrl = String.format("https://%s%s?%s", fileUrl.getHost(), fileUrl.getPath(), sasToken);
+    try (CloseableHttpClient httpClient = HttpUtils.makeHttpClient()) {
+      HttpDelete httpDelete = new HttpDelete(deleteUrl);
+      try (CloseableHttpResponse response = httpClient.execute(httpDelete)) {
+        int code = response.getStatusLine().getStatusCode();
+        String responseString = "";
+        if (response.getEntity() != null) {
+          responseString = EntityUtils.toString(response.getEntity());
+        }
+        switch (code) {
+          case HttpStatus.SC_ACCEPTED:  // 202
+          case HttpStatus.SC_NOT_FOUND: // 404
+            break;
+          case HttpStatus.SC_FORBIDDEN: // 403
+            throw new MicrosoftAzureNotAllowedException(String.format("Not allowed to delete storage blob %s. "
+                + "Microsoft Azure Storage Service response: %s", httpDelete.getURI().toASCIIString(), responseString));
+          default:
+            throw new MicrosoftAzureStorageClientException(String.format("Deleting Azure storage blob '%s' failed "
+                    + "with HTTP response code %d. Microsoft Azure Storage Service response: %s",
+                httpDelete.getURI().toASCIIString(), code, responseString));
+        }
+      }
+    }
   }
 }

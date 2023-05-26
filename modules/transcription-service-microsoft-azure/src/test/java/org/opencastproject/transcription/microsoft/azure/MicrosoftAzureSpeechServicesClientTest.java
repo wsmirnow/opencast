@@ -96,8 +96,10 @@ public class MicrosoftAzureSpeechServicesClientTest {
     //String sasToken = azureAuthorization.generateUserDelegationSASToken("clw", null, null, "/opencast-transcriptions",
     //    null, null, null, null, null, null, null, null, null, null, null, "c", null, null, null, null, null, null,
     //    null, null);
-    String sasToken = azureAuthorization.generateUserDelegationSASToken("cw", null, null, "/opencast-transcriptions",
-        "c");
+
+    //String sasToken = azureAuthorization.generateUserDelegationSASToken("cw", null, null, "/opencast-transcriptions",
+    //    "c");
+    String sasToken = azureAuthorization.generateServiceSasToken("cw", null, null, "/opencast-transcriptions","c");
 
     MicrosoftAzureSpeechTranscription transcription = azureSpeechClient.createTranscription(Arrays.asList(contentUrl),
         destContainerUrl + "?" + sasToken, "Test createTranscription", "de-DE", null, "PT1H", null);
