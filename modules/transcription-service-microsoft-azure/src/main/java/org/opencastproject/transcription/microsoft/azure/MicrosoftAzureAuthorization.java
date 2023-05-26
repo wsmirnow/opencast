@@ -429,7 +429,7 @@ public class MicrosoftAzureAuthorization {
       queryArgs.add("rscl=" + StringUtils.trimToEmpty(rscl));
     }
     //    rsct = Content-Type (rsct)
-    stringBuilder.append(StringUtils.trimToEmpty(rsct) + "\n");
+    stringBuilder.append(StringUtils.trimToEmpty(rsct));
     if (StringUtils.isNotBlank(rsct)) {
       queryArgs.add("rsct=" + StringUtils.trimToEmpty(rsct));
     }
