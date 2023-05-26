@@ -107,7 +107,7 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
 
   private static final String DEFAULT_AZURE_BLOB_PATH = "";
   private static final String DEFAULT_AZURE_CONTAINER_NAME = "opencast-transcriptions";
-  private static final float DEFAULT_MIN_CONFIDENCE = 0.7f;
+  private static final float DEFAULT_MIN_CONFIDENCE = 1.0f;
   private static final int DEFAULT_SPLIT_TEXT_LINE_LENGTH = 100;
   private static final String KEY_ENABLED = "enabled";
   private static final String KEY_LANGUAGE = "language";
@@ -495,8 +495,8 @@ public class MicrosoftAzureTranscriptionService extends AbstractJobProducer impl
     //// upload file to azure storage container
     String azureBlobUrl;
     try {
-      azureBlobUrl = azureStorageClient.uploadFile(trackFile, azureContainerName,
-          azureBlobPath, jobId + "." + FilenameUtils.getExtension(trackFile.getName()));
+      String filename = String.format("%d-%s.%s", jobId, mpId, FilenameUtils.getExtension(trackFile.getName()));
+      azureBlobUrl = azureStorageClient.uploadFile(trackFile, azureContainerName, azureBlobPath, filename);
     } catch (IOException | MicrosoftAzureNotAllowedException | MicrosoftAzureStorageClientException e) {
       throw new TranscriptionServiceException(String.format(
           "Unable to upload track %s from media package '%s' to Microsoft Azure storage container '%s'.",

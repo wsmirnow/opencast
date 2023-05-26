@@ -52,6 +52,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class MicrosoftAzureSpeechServicesClient {
 
@@ -323,11 +324,11 @@ public class MicrosoftAzureSpeechServicesClient {
     } else {
       content = transcriptionJson.toSrt(minConfidence, maxCueLength);
     }
-    String fileName;
+    String fileName = UUID.randomUUID().toString();
     if (formatIsWebVtt) {
-      fileName = "captions.vtt";
+      fileName += ".vtt";
     } else {
-      fileName = "captions.srt";
+      fileName += ".srt";
     }
     try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
       return workspace.putInCollection(WORKSPACE_COLLECTION, fileName, is);
